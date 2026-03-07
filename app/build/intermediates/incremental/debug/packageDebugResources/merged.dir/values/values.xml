@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.GraberHub" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#001B2E</item>
+        <item name="android:navigationBarColor">#001B2E</item>
+    </style>
+</resources>
