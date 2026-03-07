@@ -120,3 +120,18 @@ data class CreateVerseRequest(
 data class UpdateKidColorRequest(
     val color: String
 )
+
+// Photo Settings
+data class PhotoSettings(
+    val mode: String? = "dashboard",
+    val album_url: String? = null,
+    val transition_seconds: Int? = 10,
+    val show_clock: Boolean? = true,
+    val show_weather: Boolean? = true,
+    val ken_burns: Boolean? = true
+)
+
+data class PhotoSettingsRequest(
+    val mode: String? = null,
+    val album_url: String? = null
+)

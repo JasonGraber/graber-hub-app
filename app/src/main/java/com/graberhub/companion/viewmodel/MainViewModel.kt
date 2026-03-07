@@ -65,6 +65,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _alarmPlaying = MutableStateFlow(false)
     val alarmPlaying: StateFlow<Boolean> = _alarmPlaying.asStateFlow()
 
+    private val _photoSettings = MutableStateFlow<PhotoSettings?>(null)
+    val photoSettings: StateFlow<PhotoSettings?> = _photoSettings.asStateFlow()
+
+    private val _photoSettingsSaved = MutableStateFlow<String?>(null)
+    val photoSettingsSaved: StateFlow<String?> = _photoSettingsSaved.asStateFlow()
+
     private var timerTickJob: Job? = null
     private var alarmAutoStopJob: Job? = null
 
@@ -438,6 +444,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 RetrofitClient.getApiService().updateKid(kidId, UpdateKidColorRequest(colorHex))
             } catch (e: Exception) {
                 Log.w("MainViewModel", "Failed to sync kid color to server: ${e.message}")
+            }
+        }
+    }
+
+    // ── Photo Settings ─────────────────────────────────────
+
+    fun loadPhotoSettings() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().getPhotoSettings()
+                if (response.isSuccessful) {
+                    _photoSettings.value = response.body()
+                }
+            } catch (_: Exception) {
+                Log.w("MainViewModel", "Failed to load photo settings")
+            }
+        }
+    }
+
+    fun updateDisplayMode(mode: String) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().updatePhotoSettings(
+                    PhotoSettingsRequest(mode = mode)
+                )
+                if (response.isSuccessful) {
+                    _photoSettings.value = response.body()
+                    _photoSettingsSaved.value = "mode"
+                    delay(2000)
+                    _photoSettingsSaved.value = null
+                }
+            } catch (_: Exception) {
+                _error.value = "Failed to update display mode"
+            }
+        }
+    }
+
+    fun updateAlbumUrl(url: String) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().updatePhotoSettings(
+                    PhotoSettingsRequest(album_url = url)
+                )
+                if (response.isSuccessful) {
+                    _photoSettings.value = response.body()
+                    _photoSettingsSaved.value = "album"
+                    delay(2000)
+                    _photoSettingsSaved.value = null
+                }
+            } catch (_: Exception) {
+                _error.value = "Failed to save album URL"
             }
         }
     }

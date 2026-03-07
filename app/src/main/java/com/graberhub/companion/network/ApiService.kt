@@ -65,4 +65,11 @@ interface ApiService {
     // Kids
     @PUT("api.php/kids/{id}")
     suspend fun updateKid(@Path("id") id: Int, @Body request: UpdateKidColorRequest): Response<ApiResponse>
+
+    // Photo Settings
+    @GET("api.php/photo-settings")
+    suspend fun getPhotoSettings(): Response<PhotoSettings>
+
+    @POST("api.php/photo-settings")
+    suspend fun updatePhotoSettings(@Body request: PhotoSettingsRequest): Response<PhotoSettings>
 }

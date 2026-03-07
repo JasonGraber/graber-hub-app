@@ -1,6 +1,8 @@
 package com.graberhub.companion.ui.screens
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,11 +35,22 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val connectionStatus by viewModel.connectionStatus.collectAsStateWithLifecycle()
     val kidsConfig by viewModel.kidsConfig.collectAsStateWithLifecycle()
     val verses by viewModel.verses.collectAsStateWithLifecycle()
+    val photoSettings by viewModel.photoSettings.collectAsStateWithLifecycle()
+    val photoSettingsSaved by viewModel.photoSettingsSaved.collectAsStateWithLifecycle()
     var serverUrl by remember { mutableStateOf(viewModel.prefs.serverUrl) }
+    var albumUrl by remember { mutableStateOf("") }
     var showVerseDialog by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(Unit) { viewModel.loadVerses() }
+    LaunchedEffect(Unit) {
+        viewModel.loadVerses()
+        viewModel.loadPhotoSettings()
+    }
+
+    // Sync album URL from API when photo settings load
+    LaunchedEffect(photoSettings) {
+        photoSettings?.album_url?.let { albumUrl = it }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -199,6 +213,121 @@ fun SettingsScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Display Mode section
+        item {
+            val currentMode = photoSettings?.mode ?: "dashboard"
+            SettingsCard(title = "📺 Display Mode") {
+                val modes = listOf(
+                    Triple("dashboard", "Dashboard", "Chores, schedule, and countdowns"),
+                    Triple("photos", "Photos", "Full-screen photo slideshow"),
+                    Triple("auto", "Auto", "Photos at night (8 PM–7 AM), dashboard during day")
+                )
+                modes.forEach { (value, label, description) ->
+                    val isSelected = currentMode == value
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { viewModel.updateDisplayMode(value) }
+                            .then(
+                                if (isSelected) Modifier.border(
+                                    2.dp, ShedBlue, RoundedCornerShape(10.dp)
+                                ) else Modifier.border(
+                                    1.dp, BorderLight, RoundedCornerShape(10.dp)
+                                )
+                            ),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) ShedBlueLight.copy(alpha = 0.3f) else BackgroundGray
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) ShedBlueDark else TextPrimary,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                Text(
+                                    description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = ShedBlue,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                // Success feedback
+                AnimatedVisibility(
+                    visible = photoSettingsSaved == "mode",
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Text(
+                        "✓ Display mode saved",
+                        color = CheckGreen,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        }
+
+        // Photo Album section
+        item {
+            SettingsCard(title = "🖼️ Photo Album") {
+                OutlinedTextField(
+                    value = albumUrl,
+                    onValueChange = { albumUrl = it },
+                    label = { Text("Google Photos Album URL") },
+                    placeholder = { Text("Paste shared album link") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AnimatedVisibility(
+                        visible = photoSettingsSaved == "album",
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Text(
+                            "✓ Album URL saved",
+                            color = CheckGreen,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    Button(
+                        onClick = { viewModel.updateAlbumUrl(albumUrl) },
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                        enabled = albumUrl.isNotBlank()
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        }
+
         // Version
         item {
             SettingsCard(title = "ℹ️ About") {
@@ -207,7 +336,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Version", color = TextSecondary)
-                    Text("1.0.10", color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("1.1.0", color = TextPrimary, fontWeight = FontWeight.Medium)
                 }
             }
         }
