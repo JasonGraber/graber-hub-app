@@ -66,7 +66,7 @@ class AlarmService : Service() {
             .build()
 
         if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification, 2)
+            startForeground(NOTIFICATION_ID, notification, 2) // FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
@@ -96,18 +96,19 @@ class AlarmService : Service() {
     private fun stopAlarmAndSelf() {
         stopHandler.removeCallbacks(autoStopRunnable)
         mediaPlayer?.let {
-            runCatching {
+            try {
                 it.stop()
                 it.release()
-            }
+            } catch (_: Exception) {}
         }
         mediaPlayer = null
         stopForeground(true)
         stopSelf()
-        val broadcast = Intent(ACTION_STOP).apply {
+
+        val broadcastIntent = Intent(ACTION_STOP).apply {
             setPackage(packageName)
         }
-        sendBroadcast(broadcast)
+        sendBroadcast(broadcastIntent)
     }
 
     override fun onDestroy() {
@@ -118,11 +119,15 @@ class AlarmService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(CHANNEL_ID, "Timer Alarm", NotificationManager.IMPORTANCE_HIGH).apply {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Timer Alarm",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
             description = "Plays when a timer finishes"
             setSound(null, null)
             enableVibration(true)
         }
-        (getSystemService(NotificationManager::class.java)).createNotificationChannel(channel)
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 }

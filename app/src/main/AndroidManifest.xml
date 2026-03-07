@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:allowBackup="true"
@@ -12,11 +13,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="Graber Hub"
         android:supportsRtl="true"
-        android:theme="@style/Theme.GraberHub">
+        android:theme="@style/Theme.GraberHub"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:label="Graber Hub"
             android:theme="@style/Theme.GraberHub">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -29,4 +32,5 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
     </application>
+
 </manifest>

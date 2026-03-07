@@ -6,44 +6,74 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 val GraberTypography = Typography(
-    headlineLarge = TextStyle(
+    displayLarge = TextStyle(
+        fontSize = 32.sp,
         fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.5).sp
+    ),
+    displayMedium = TextStyle(
         fontSize = 28.sp,
-        lineHeight = 36.sp
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.5).sp
+    ),
+    headlineLarge = TextStyle(
+        fontSize = 24.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.sp
     ),
     headlineMedium = TextStyle(
-        fontWeight = FontWeight.Bold,
-        fontSize = 24.sp,
-        lineHeight = 32.sp
+        fontSize = 20.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.sp
+    ),
+    headlineSmall = TextStyle(
+        fontSize = 18.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.sp
     ),
     titleLarge = TextStyle(
+        fontSize = 16.sp,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp,
-        lineHeight = 28.sp
+        letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        lineHeight = 24.sp
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.1.sp
+    ),
+    titleSmall = TextStyle(
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.1.sp
     ),
     bodyLarge = TextStyle(
-        fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
-        lineHeight = 24.sp
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.15.sp
     ),
     bodyMedium = TextStyle(
-        fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.25.sp
+    ),
+    bodySmall = TextStyle(
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.4.sp
     ),
     labelLarge = TextStyle(
-        fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
-        lineHeight = 20.sp
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.1.sp
     ),
     labelMedium = TextStyle(
-        fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
-        lineHeight = 16.sp
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.5.sp
+    ),
+    labelSmall = TextStyle(
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.5.sp
     )
 )

@@ -1,215 +1,239 @@
 package com.graberhub.companion.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.graberhub.companion.data.models.KidConfig
-import com.graberhub.companion.ui.components.*
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.graberhub.companion.data.models.Verse
+import com.graberhub.companion.ui.components.ColorPickerDialog
 import com.graberhub.companion.ui.theme.*
 import com.graberhub.companion.viewmodel.MainViewModel
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
-    val kidsConfig by viewModel.kidsConfig.collectAsState()
-    val connectionStatus by viewModel.connectionStatus.collectAsState()
-    val verses by viewModel.verses.collectAsState()
-    val photoSettings by viewModel.photoSettings.collectAsState()
-
+    val connectionStatus by viewModel.connectionStatus.collectAsStateWithLifecycle()
+    val kidsConfig by viewModel.kidsConfig.collectAsStateWithLifecycle()
+    val verses by viewModel.verses.collectAsStateWithLifecycle()
     var serverUrl by remember { mutableStateOf(viewModel.prefs.serverUrl) }
     var showVerseDialog by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) { viewModel.loadVerses() }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        SectionHeader("⚙️ Settings")
-
-        // === SERVER SECTION ===
-        SettingsSectionCard("Server") {
-            OutlinedTextField(
-                value = serverUrl,
-                onValueChange = { serverUrl = it },
-                label = { Text("Server URL") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+        item {
+            Text(
+                "⚙️ Settings",
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Button(
-                    onClick = {
-                        viewModel.updateServerUrl(serverUrl)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
-                ) {
-                    Icon(Icons.Default.Save, "Save", tint = Color.White)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Save", color = Color.White)
-                }
-                OutlinedButton(onClick = { viewModel.testConnection() }) {
-                    Icon(Icons.Default.Wifi, "Test")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Test")
-                }
-            }
-            connectionStatus?.let { status ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    status,
-                    color = if (status.startsWith("✓")) CheckGreen else if (status.startsWith("✗")) ShedPink else TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Server URL section
+        item {
+            SettingsCard(title = "🌐 Server Connection") {
+                OutlinedTextField(
+                    value = serverUrl,
+                    onValueChange = { serverUrl = it },
+                    label = { Text("Server URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
 
-        // === DISPLAY MODE SECTION (NEW) ===
-        SettingsSectionCard("Display Mode") {
-            val modes = listOf(
-                Triple("dashboard", "Dashboard", "Chores, schedule, and countdowns"),
-                Triple("photos", "Photos", "Full-screen photo slideshow"),
-                Triple("auto", "Auto", "Photos at night (8 PM–7 AM), dashboard during day")
-            )
-            modes.forEach { (mode, label, description) ->
+                Spacer(Modifier.height(12.dp))
+
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { viewModel.updateDisplayMode(mode) }
-                        .background(if (photoSettings.mode == mode) ShedBlueLight else Color.Transparent)
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
-                        selected = photoSettings.mode == mode,
-                        onClick = { viewModel.updateDisplayMode(mode) },
-                        colors = RadioButtonDefaults.colors(selectedColor = ShedBlue)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(label, fontWeight = FontWeight.Medium, color = TextPrimary)
-                        Text(description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    // Connection status
+                    connectionStatus?.let { status ->
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = when {
+                                status.contains("✓") -> CheckGreen
+                                status.contains("✗") -> ShedPink
+                                else -> TextSecondary
+                            }
+                        )
                     }
-                }
-                if (mode != "auto") Spacer(modifier = Modifier.height(4.dp))
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Photo Album URL
-            var albumUrl by remember(photoSettings.album_url) { mutableStateOf(photoSettings.album_url) }
-            OutlinedTextField(
-                value = albumUrl,
-                onValueChange = { albumUrl = it },
-                label = { Text("Google Photos Album") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text("https://photos.google.com/...") }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = { viewModel.updateAlbumUrl(albumUrl) },
-                colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text("Save Album URL", color = Color.White)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // === KIDS SECTION ===
-        SettingsSectionCard("Kids") {
-            kidsConfig.forEach { kid ->
-                KidColorRow(kid = kid, onColorChange = { color ->
-                    viewModel.updateKidColor(kid.id, color)
-                })
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // === VERSE OF THE DAY SECTION ===
-        SettingsSectionCard("Verse of the Day") {
-            if (verses.isEmpty()) {
-                Text("No verses added yet", color = TextSecondary)
-            } else {
-                verses.forEach { verse ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = BackgroundGray)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                "\"${verse.text}\"",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextPrimary
-                            )
-                            Text(
-                                "— ${verse.reference}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = TextSecondary,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
+                    Row {
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.updateServerUrl(serverUrl)
+                                viewModel.testConnection()
+                            }
+                        ) {
+                            Text("Save & Test")
                         }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { showVerseDialog = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Add, "Add Verse")
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Add Verse")
+        }
+
+        // Kid Colors section
+        item {
+            SettingsCard(title = "🎨 Kid Colors") {
+                kidsConfig.forEach { kidConfig ->
+                    val color = try {
+                        Color(android.graphics.Color.parseColor(kidConfig.color))
+                    } catch (_: Exception) { ShedBlue }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                            .clickable { showColorPicker = kidConfig.id },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                kidConfig.name.first().uppercase(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            kidConfig.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            kidConfig.color,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Verses section
+        item {
+            SettingsCard(title = "📖 Bible Verses") {
+                if (verses.isEmpty()) {
+                    Text(
+                        "No verses yet. Add one to display on the dashboard.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextHint,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    verses.forEach { verse ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = BackgroundGray
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "\"${verse.text}\"",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextPrimary
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "— ${verse.reference}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = ShedBlue,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { showVerseDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add Verse")
+                }
+            }
+        }
 
         // Version
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            elevation = CardDefaults.cardElevation(1.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text("Graber Hub v1.1.0", style = MaterialTheme.typography.bodySmall, color = TextHint)
+        item {
+            SettingsCard(title = "ℹ️ About") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Version", color = TextSecondary)
+                    Text("1.0.9", color = TextPrimary, fontWeight = FontWeight.Medium)
+                }
             }
         }
+
+        item { Spacer(Modifier.height(80.dp)) }
     }
 
+    // Color picker dialog
+    showColorPicker?.let { kidId ->
+        val currentColor = kidsConfig.find { it.id == kidId }?.color ?: "#03a9f4"
+        ColorPickerDialog(
+            selectedColor = currentColor,
+            onColorSelected = { color ->
+                viewModel.updateKidColor(kidId, color)
+                showColorPicker = null
+            },
+            onDismiss = { showColorPicker = null }
+        )
+    }
+
+    // Add verse dialog
     if (showVerseDialog) {
-        VerseDialog(
+        AddVerseDialog(
             onSave = { text, reference ->
                 viewModel.addVerse(text, reference)
+                showVerseDialog = false
             },
             onDismiss = { showVerseDialog = false }
         )
@@ -217,19 +241,23 @@ fun SettingsScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun SettingsSectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        elevation = CardDefaults.cardElevation(2.dp)
+private fun SettingsCard(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = CardBackground
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = ShedBlue,
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             content()
@@ -238,89 +266,65 @@ fun SettingsSectionCard(title: String, content: @Composable ColumnScope.() -> Un
 }
 
 @Composable
-private fun KidColorRow(kid: KidConfig, onColorChange: (String) -> Unit) {
-    var showColorPicker by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(parseColor(kid.color))
-                .clickable { showColorPicker = true },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                kid.name.take(1).uppercase(),
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(kid.name, style = MaterialTheme.typography.bodyLarge, color = TextPrimary, modifier = Modifier.weight(1f))
-        OutlinedButton(onClick = { showColorPicker = true }) {
-            Text("Change Color", style = MaterialTheme.typography.labelSmall)
-        }
-    }
-
-    if (showColorPicker) {
-        ColorPickerDialog(
-            currentColor = kid.color,
-            onColorSelected = onColorChange,
-            onDismiss = { showColorPicker = false }
-        )
-    }
-}
-
-@Composable
-fun VerseDialog(
-    onSave: (String, String) -> Unit,
+private fun AddVerseDialog(
+    onSave: (text: String, reference: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var text by remember { mutableStateOf("") }
     var reference by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Verse") },
-        text = {
-            Column {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = CardBackground
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Add Bible Verse",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TextPrimary
+                )
+
+                Spacer(Modifier.height(16.dp))
+
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text("Verse text") },
+                    label = { Text("Verse Text") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
+                    minLines = 3,
+                    maxLines = 5
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+
+                Spacer(Modifier.height(12.dp))
+
                 OutlinedTextField(
                     value = reference,
                     onValueChange = { reference = it },
-                    label = { Text("Reference (e.g., John 3:16)") },
+                    label = { Text("Reference (e.g. John 3:16)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (text.isNotBlank() && reference.isNotBlank()) {
-                        onSave(text, reference)
-                        onDismiss()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
-            ) { Text("Save", color = Color.White) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondary)
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (text.isNotBlank() && reference.isNotBlank()) {
+                                onSave(text, reference)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                        enabled = text.isNotBlank() && reference.isNotBlank()
+                    ) { Text("Save") }
+                }
             }
         }
-    )
+    }
 }

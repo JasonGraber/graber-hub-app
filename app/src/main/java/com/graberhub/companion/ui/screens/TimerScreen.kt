@@ -1,231 +1,317 @@
 package com.graberhub.companion.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.graberhub.companion.ui.components.SectionHeader
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.graberhub.companion.ui.theme.*
 import com.graberhub.companion.viewmodel.MainViewModel
 
 @Composable
 fun TimerScreen(viewModel: MainViewModel) {
-    val timerStatus by viewModel.timerStatus.collectAsState()
-    val secondsLeft by viewModel.timerSecondsLeft.collectAsState()
-    val timerFinished by viewModel.timerFinished.collectAsState()
-    val alarmPlaying by viewModel.alarmPlaying.collectAsState()
+    val timerStatus by viewModel.timerStatus.collectAsStateWithLifecycle()
+    val secondsLeft by viewModel.timerSecondsLeft.collectAsStateWithLifecycle()
+    val timerFinished by viewModel.timerFinished.collectAsStateWithLifecycle()
+    val alarmPlaying by viewModel.alarmPlaying.collectAsStateWithLifecycle()
 
-    var minutes by remember { mutableIntStateOf(5) }
-    var label by remember { mutableStateOf("") }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var selectedMinutes by remember { mutableIntStateOf(15) }
+    var timerLabel by remember { mutableStateOf("") }
+
+    val isActive = timerStatus?.active == true
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        SectionHeader("⏰ Timer")
-        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            "⏱️ Timer",
+            style = MaterialTheme.typography.headlineMedium,
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+        )
 
-        if (timerFinished) {
-            // Timer finished - show alarm UI
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = ShedPinkLight)
+        Spacer(Modifier.height(24.dp))
+
+        // Timer display
+        if (isActive || timerFinished) {
+            // Show countdown
+            val minutes = (secondsLeft / 60).toInt()
+            val seconds = (secondsLeft % 60).toInt()
+
+            Box(
+                modifier = Modifier
+                    .size(220.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (timerFinished) ShedPink.copy(alpha = 0.15f)
+                        else ShedBlueLight.copy(alpha = 0.3f)
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("⏰", fontSize = 64.sp)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "Time's Up!",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = ShedPink
-                    )
-                    if (timerStatus?.label?.isNotEmpty() == true) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(timerStatus?.label ?: "", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    if (alarmPlaying) {
-                        Button(
-                            onClick = { viewModel.stopAlarmSound() },
-                            colors = ButtonDefaults.buttonColors(containerColor = ShedPink),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.VolumeOff, "Stop", tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Stop Alarm", color = Color.White)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    OutlinedButton(
-                        onClick = { viewModel.dismissTimerFinished() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Dismiss")
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { viewModel.cancelTimer() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Reset", color = TextSecondary)
-                    }
-                }
-            }
-        } else if (timerStatus?.active == true) {
-            // Timer running
-            val mins = secondsLeft / 60
-            val secs = secondsLeft % 60
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
-                elevation = CardDefaults.cardElevation(4.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(200.dp)
-                            .clip(CircleShape)
-                            .background(ShedBlueLight),
-                        contentAlignment = Alignment.Center
-                    ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (timerFinished) {
+                        // Pulsing animation for finished state
+                        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                        val scale by infiniteTransition.animateFloat(
+                            initialValue = 1f,
+                            targetValue = 1.15f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(600),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "pulseScale"
+                        )
                         Text(
-                            String.format("%02d:%02d", mins, secs),
+                            "⏰",
+                            fontSize = (48 * scale).sp
+                        )
+                        Text(
+                            "Time's Up!",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = ShedPink,
+                            fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        Text(
+                            String.format("%02d:%02d", minutes, seconds),
                             fontSize = 48.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ShedBlueDark
+                            color = ShedBlue
                         )
-                    }
-
-                    if (timerStatus?.label?.isNotEmpty() == true) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            timerStatus?.label ?: "",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextSecondary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = { viewModel.cancelTimer() },
-                        colors = ButtonDefaults.buttonColors(containerColor = ShedPink),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Stop, "Cancel", tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Cancel Timer", color = Color.White)
-                    }
-                }
-            }
-        } else {
-            // Set timer
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
-                elevation = CardDefaults.cardElevation(4.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        "Set Timer",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Quick presets
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        listOf(1, 5, 10, 15, 30).forEach { preset ->
-                            OutlinedButton(
-                                onClick = { minutes = preset },
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (minutes == preset) ShedBlueLight else Color.Transparent
-                                ),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("${preset}m", color = if (minutes == preset) ShedBlueDark else TextSecondary)
+                        timerStatus?.label?.let { label ->
+                            if (label.isNotEmpty()) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextSecondary
+                                )
                             }
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(32.dp))
 
-                    // Custom minutes
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+            // Action buttons
+            if (timerFinished) {
+                if (alarmPlaying) {
+                    Button(
+                        onClick = { viewModel.stopAlarmSound() },
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedPink),
+                        modifier = Modifier.fillMaxWidth(0.6f),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        IconButton(onClick = { if (minutes > 1) minutes-- }) {
-                            Icon(Icons.Default.Remove, "Decrease", tint = ShedBlue)
+                        Text("🔇 Stop Alarm", fontSize = 16.sp, modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                Button(
+                    onClick = { viewModel.dismissTimerFinished() },
+                    colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                    modifier = Modifier.fillMaxWidth(0.6f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("✓ Dismiss", fontSize = 16.sp, modifier = Modifier.padding(vertical = 4.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { viewModel.cancelTimer() },
+                    modifier = Modifier.fillMaxWidth(0.6f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Reset Timer")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { viewModel.cancelTimer() },
+                    modifier = Modifier.fillMaxWidth(0.6f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ShedPink)
+                ) {
+                    Text("✕ Cancel Timer", fontSize = 16.sp, modifier = Modifier.padding(vertical = 4.dp))
+                }
+            }
+        } else {
+            // Timer setup
+            Box(
+                modifier = Modifier
+                    .size(220.dp)
+                    .clip(CircleShape)
+                    .background(BackgroundGray)
+                    .clickable { showTimePicker = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "$selectedMinutes",
+                        fontSize = 56.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ShedBlue
+                    )
+                    Text(
+                        "minutes",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextSecondary
+                    )
+                    Text(
+                        "Tap to change",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextHint
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // Quick presets
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf(5, 10, 15, 20, 30, 45).forEach { mins ->
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { selectedMinutes = mins },
+                        color = if (selectedMinutes == mins) ShedBlue else BackgroundGray,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            "${mins}m",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            color = if (selectedMinutes == mins) Color.White else TextSecondary,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // Label input
+            OutlinedTextField(
+                value = timerLabel,
+                onValueChange = { timerLabel = it },
+                label = { Text("Label (optional)") },
+                modifier = Modifier.fillMaxWidth(0.8f),
+                singleLine = true
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            // Start button
+            Button(
+                onClick = {
+                    viewModel.startTimer(selectedMinutes, timerLabel)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                modifier = Modifier.fillMaxWidth(0.6f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("▶ Start Timer", fontSize = 16.sp, modifier = Modifier.padding(vertical = 4.dp))
+            }
+        }
+    }
+
+    // Time picker dialog
+    if (showTimePicker) {
+        MinutePickerDialog(
+            initialMinutes = selectedMinutes,
+            onMinutesSelected = {
+                selectedMinutes = it
+                showTimePicker = false
+            },
+            onDismiss = { showTimePicker = false }
+        )
+    }
+}
+
+@Composable
+private fun MinutePickerDialog(
+    initialMinutes: Int,
+    onMinutesSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var minutes by remember { mutableIntStateOf(initialMinutes) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = CardBackground
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Set Timer",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TextPrimary
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        TextButton(onClick = { minutes = (minutes + 5).coerceAtMost(180) }) {
+                            Text("▲", fontSize = 24.sp)
                         }
                         Text(
                             "$minutes",
                             fontSize = 48.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ShedBlue,
-                            modifier = Modifier.padding(horizontal = 24.dp)
+                            color = ShedBlue
                         )
-                        IconButton(onClick = { if (minutes < 120) minutes++ }) {
-                            Icon(Icons.Default.Add, "Increase", tint = ShedBlue)
+                        TextButton(onClick = { minutes = (minutes - 5).coerceAtLeast(1) }) {
+                            Text("▼", fontSize = 24.sp)
                         }
                     }
-                    Text("minutes", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    OutlinedTextField(
-                        value = label,
-                        onValueChange = { label = it },
-                        label = { Text("Label (optional)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "min",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextSecondary
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
                     Button(
-                        onClick = { viewModel.startTimer(minutes, label) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, "Start", tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Start Timer", color = Color.White, fontSize = 18.sp)
-                    }
+                        onClick = { onMinutesSelected(minutes) },
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
+                    ) { Text("OK") }
                 }
             }
         }

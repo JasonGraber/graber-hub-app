@@ -20,8 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -66,9 +65,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _alarmPlaying = MutableStateFlow(false)
     val alarmPlaying: StateFlow<Boolean> = _alarmPlaying.asStateFlow()
 
-    private val _photoSettings = MutableStateFlow(PhotoSettings())
-    val photoSettings: StateFlow<PhotoSettings> = _photoSettings.asStateFlow()
-
     private var timerTickJob: Job? = null
     private var alarmAutoStopJob: Job? = null
 
@@ -83,7 +79,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initRetrofit()
         loadDashboard()
         loadTimer()
-        loadPhotoSettings()
+
         val filter = IntentFilter(AlarmService.ACTION_STOP)
         if (Build.VERSION.SDK_INT >= 33) {
             getApplication<Application>().registerReceiver(alarmStopReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -94,7 +90,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        runCatching { getApplication<Application>().unregisterReceiver(alarmStopReceiver) }
+        try {
+            getApplication<Application>().unregisterReceiver(alarmStopReceiver)
+        } catch (_: Exception) {}
     }
 
     private fun initRetrofit() {
@@ -102,6 +100,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    // ── Dashboard ──────────────────────────────────────────
 
     fun loadDashboard() {
         viewModelScope.launch {
@@ -127,12 +127,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ── Chores ─────────────────────────────────────────────
+
     fun toggleChore(choreId: Int) {
         viewModelScope.launch {
             try {
                 RetrofitClient.getApiService().toggleChore(choreId, today())
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to update chore"
             }
         }
@@ -141,9 +143,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addChore(kidId: Int, title: String, emoji: String = "") {
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().createChore(CreateChoreRequest(kidId, title, today(), emoji))
+                RetrofitClient.getApiService().createChore(
+                    CreateChoreRequest(kidId, title, today(), emoji)
+                )
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to add chore"
             }
         }
@@ -154,7 +158,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 RetrofitClient.getApiService().updateChore(choreId, UpdateChoreRequest(title, emoji))
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to edit chore"
             }
         }
@@ -165,11 +169,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 RetrofitClient.getApiService().deleteChore(choreId, today())
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to delete chore"
             }
         }
     }
+
+    // ── Schedule ───────────────────────────────────────────
 
     fun addScheduleBlock(timeStart: String, timeEnd: String, title: String, emoji: String) {
         viewModelScope.launch {
@@ -178,7 +184,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     CreateScheduleRequest(timeStart, timeEnd, title, emoji, today())
                 )
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to add schedule block"
             }
         }
@@ -191,7 +197,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     blockId, UpdateScheduleRequest(title, emoji, timeStart, timeEnd)
                 )
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to edit schedule block"
             }
         }
@@ -202,7 +208,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 RetrofitClient.getApiService().deleteScheduleBlock(blockId, today())
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to delete schedule block"
             }
         }
@@ -217,11 +223,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 RetrofitClient.getApiService().applyTemplate(TemplateRequest(blocks))
                 _error.value = null
                 loadDashboard()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to save template"
             }
         }
     }
+
+    // ── Countdowns ─────────────────────────────────────────
 
     fun loadCountdowns() {
         viewModelScope.launch {
@@ -230,7 +238,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (response.isSuccessful) {
                     _countdowns.value = response.body() ?: emptyList()
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to load countdowns"
             }
         }
@@ -239,9 +247,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addCountdown(label: String, emoji: String, targetDate: String) {
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().createCountdown(CreateCountdownRequest(label, emoji, targetDate))
+                RetrofitClient.getApiService().createCountdown(
+                    CreateCountdownRequest(label, emoji, targetDate)
+                )
                 loadCountdowns()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to add countdown"
             }
         }
@@ -252,11 +262,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 RetrofitClient.getApiService().deleteCountdown(id)
                 loadCountdowns()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to delete countdown"
             }
         }
     }
+
+    // ── Verses ─────────────────────────────────────────────
 
     fun loadVerses() {
         viewModelScope.launch {
@@ -265,7 +277,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (response.isSuccessful) {
                     _verses.value = response.body() ?: emptyList()
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to load verses"
             }
         }
@@ -276,21 +288,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 RetrofitClient.getApiService().createVerse(CreateVerseRequest(text, reference))
                 loadVerses()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to add verse"
             }
         }
     }
+
+    // ── Timer ──────────────────────────────────────────────
 
     fun loadTimer() {
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.getApiService().getTimer()
                 if (response.isSuccessful) {
-                    val timer = response.body()
-                    _timerStatus.value = timer
-                    if (timer?.active == true && timer.end_time != null) {
-                        startLocalCountdown(timer.end_time)
+                    val status = response.body()
+                    _timerStatus.value = status
+                    if (status?.active == true && status.end_time != null) {
+                        startLocalCountdown(status.end_time)
                     }
                 }
             } catch (_: Exception) {}
@@ -303,7 +317,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 RetrofitClient.getApiService().createTimer(CreateTimerRequest(minutes, label))
                 _timerFinished.value = false
                 loadTimer()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to start timer"
             }
         }
@@ -319,7 +333,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _timerSecondsLeft.value = 0
                 _timerFinished.value = false
                 stopAlarmSound()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _error.value = "Failed to cancel timer"
             }
         }
@@ -337,6 +351,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             action = AlarmService.ACTION_START
         }
         app.startForegroundService(intent)
+
         alarmAutoStopJob?.cancel()
         alarmAutoStopJob = viewModelScope.launch {
             delay(15000)
@@ -359,15 +374,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         timerTickJob = viewModelScope.launch {
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
             val endMs = try {
-                sdf.parse(endTimeIso)?.time ?: return@launch
-            } catch (e: Exception) {
+                sdf.parse(endTimeIso)?.time
+            } catch (_: Exception) {
                 try {
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                        .parse(endTimeIso)?.time ?: return@launch
-                } catch (e2: Exception) {
-                    return@launch
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).parse(endTimeIso)?.time
+                } catch (_: Exception) {
+                    null
                 }
-            }
+            } ?: return@launch
 
             while (true) {
                 val secondsLeft = ((endMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
@@ -382,6 +396,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // ── Settings ───────────────────────────────────────────
 
     fun updateServerUrl(url: String) {
         prefs.serverUrl = url
@@ -407,14 +423,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateKidColor(kidId: Int, colorHex: String) {
-        val updatedConfigs = _kidsConfig.value.map { config ->
-            if (config.id == kidId) config.copy(color = colorHex) else config
+        val updatedConfigs = _kidsConfig.value.map {
+            if (it.id == kidId) it.copy(color = colorHex) else it
         }
         prefs.kidsConfig = updatedConfigs
         _kidsConfig.value = updatedConfigs
 
-        _kids.value = _kids.value.map { kid ->
-            if (kid.id == kidId) kid.copy(color = colorHex) else kid
+        _kids.value = _kids.value.map {
+            if (it.id == kidId) it.copy(color = colorHex) else it
         }
 
         viewModelScope.launch {
@@ -422,39 +438,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 RetrofitClient.getApiService().updateKid(kidId, UpdateKidColorRequest(colorHex))
             } catch (e: Exception) {
                 Log.w("MainViewModel", "Failed to sync kid color to server: ${e.message}")
-            }
-        }
-    }
-
-    fun loadPhotoSettings() {
-        viewModelScope.launch {
-            try {
-                val response = RetrofitClient.getApiService().getPhotoSettings()
-                if (response.isSuccessful) {
-                    response.body()?.let { _photoSettings.value = it }
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    fun updateDisplayMode(mode: String) {
-        viewModelScope.launch {
-            try {
-                RetrofitClient.getApiService().updatePhotoSettings(mapOf("mode" to mode))
-                _photoSettings.value = _photoSettings.value.copy(mode = mode)
-            } catch (e: Exception) {
-                _error.value = "Failed to update display mode"
-            }
-        }
-    }
-
-    fun updateAlbumUrl(url: String) {
-        viewModelScope.launch {
-            try {
-                RetrofitClient.getApiService().updatePhotoSettings(mapOf("album_url" to url))
-                _photoSettings.value = _photoSettings.value.copy(album_url = url)
-            } catch (e: Exception) {
-                _error.value = "Failed to update album URL"
             }
         }
     }

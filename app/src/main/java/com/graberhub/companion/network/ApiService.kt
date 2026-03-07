@@ -9,6 +9,7 @@ interface ApiService {
     @GET("api.php/dashboard")
     suspend fun getDashboard(): Response<DashboardResponse>
 
+    // Chores
     @POST("api.php/chores")
     suspend fun createChore(@Body request: CreateChoreRequest): Response<ApiResponse>
 
@@ -21,6 +22,7 @@ interface ApiService {
     @DELETE("api.php/chores/{id}")
     suspend fun deleteChore(@Path("id") id: Int, @Query("date") date: String): Response<ApiResponse>
 
+    // Schedule
     @POST("api.php/schedule")
     suspend fun createScheduleBlock(@Body request: CreateScheduleRequest): Response<ApiResponse>
 
@@ -33,6 +35,7 @@ interface ApiService {
     @DELETE("api.php/schedule/{id}")
     suspend fun deleteScheduleBlock(@Path("id") id: Int, @Query("date") date: String): Response<ApiResponse>
 
+    // Countdowns
     @GET("api.php/countdowns")
     suspend fun getCountdowns(): Response<List<Countdown>>
 
@@ -42,15 +45,14 @@ interface ApiService {
     @DELETE("api.php/countdowns/{id}")
     suspend fun deleteCountdown(@Path("id") id: Int): Response<ApiResponse>
 
+    // Verses
     @GET("api.php/verses")
     suspend fun getVerses(): Response<List<Verse>>
 
     @POST("api.php/verses")
     suspend fun createVerse(@Body request: CreateVerseRequest): Response<ApiResponse>
 
-    @PUT("api.php/kids/{id}")
-    suspend fun updateKid(@Path("id") id: Int, @Body request: UpdateKidColorRequest): Response<ApiResponse>
-
+    // Timer
     @GET("api.php/timer")
     suspend fun getTimer(): Response<TimerStatus>
 
@@ -60,9 +62,7 @@ interface ApiService {
     @DELETE("api.php/timer")
     suspend fun deleteTimer(): Response<ApiResponse>
 
-    @GET("api.php/photo-settings")
-    suspend fun getPhotoSettings(): Response<PhotoSettings>
-
-    @POST("api.php/photo-settings")
-    suspend fun updatePhotoSettings(@Body settings: Map<String, String>): Response<ApiResponse>
+    // Kids
+    @PUT("api.php/kids/{id}")
+    suspend fun updateKid(@Path("id") id: Int, @Body request: UpdateKidColorRequest): Response<ApiResponse>
 }

@@ -5,16 +5,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.graberhub.companion.ui.screens.*
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.graberhub.companion.ui.navigation.NavGraph
+import com.graberhub.companion.ui.navigation.Screen
 import com.graberhub.companion.ui.theme.*
 import com.graberhub.companion.viewmodel.MainViewModel
 
@@ -30,74 +32,89 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-enum class Tab(val label: String, val icon: ImageVector) {
-    Schedule("Schedule", Icons.Default.CalendarMonth),
-    Chores("Chores", Icons.Default.CheckCircle),
-    Timer("Timer", Icons.Default.Timer),
-    Countdowns("Countdowns", Icons.Default.Flag),
-    Settings("Settings", Icons.Default.Settings)
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GraberHubApp(viewModel: MainViewModel = viewModel()) {
-    var selectedTab by remember { mutableStateOf(Tab.Schedule) }
-    val error by viewModel.error.collectAsState()
+fun GraberHubApp() {
+    val navController = rememberNavController()
+    val viewModel: MainViewModel = viewModel()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    val screens = listOf(
+        Screen.Schedule,
+        Screen.Chores,
+        Screen.Timer,
+        Screen.Countdowns,
+        Screen.Settings
+    )
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Graber Hub", color = Color.White) },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = ShedBlueDark
-                )
-            )
-        },
+        modifier = Modifier.fillMaxSize(),
+        containerColor = BackgroundGray,
         bottomBar = {
             NavigationBar(
                 containerColor = CardBackground,
-                tonalElevation = 8.dp
+                tonalElevation = 4.dp
             ) {
-                Tab.entries.forEach { tab ->
+                screens.forEach { screen ->
+                    val selected = currentRoute == screen.route
                     NavigationBarItem(
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
+                        selected = selected,
+                        onClick = {
+                            if (currentRoute != screen.route) {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        },
+                        icon = {
+                            Text(
+                                screen.emoji,
+                                fontSize = 20.sp
+                            )
+                        },
+                        label = {
+                            Text(
+                                screen.label,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1
+                            )
+                        },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = ShedBlue,
                             selectedTextColor = ShedBlue,
-                            unselectedIconColor = TextHint,
-                            unselectedTextColor = TextHint,
-                            indicatorColor = ShedBlueLight
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = ShedBlueLight.copy(alpha = 0.3f)
                         )
                     )
                 }
             }
         }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (selectedTab) {
-                Tab.Schedule -> ScheduleScreen(viewModel)
-                Tab.Chores -> ChoresScreen(viewModel)
-                Tab.Timer -> TimerScreen(viewModel)
-                Tab.Countdowns -> CountdownsScreen(viewModel)
-                Tab.Settings -> SettingsScreen(viewModel)
-            }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            NavGraph(navController = navController, viewModel = viewModel)
         }
 
         // Error snackbar
-        error?.let { errorMsg ->
+        val error by viewModel.error.collectAsState()
+        error?.let { errorMessage ->
             Snackbar(
                 modifier = Modifier.padding(16.dp),
                 action = {
                     TextButton(onClick = { viewModel.clearError() }) {
-                        Text("Dismiss", color = Color.White)
+                        Text("Dismiss", color = ShedBlueLight)
                     }
                 },
-                containerColor = ShedPink
+                containerColor = TextPrimary
             ) {
-                Text(errorMsg, color = Color.White)
+                Text(errorMessage, color = BackgroundWhite)
             }
         }
     }

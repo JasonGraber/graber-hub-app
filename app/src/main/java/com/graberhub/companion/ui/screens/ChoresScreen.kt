@@ -1,6 +1,6 @@
 package com.graberhub.companion.ui.screens
 
-import androidx.compose.animation.*
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,101 +9,99 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.graberhub.companion.data.models.Chore
 import com.graberhub.companion.data.models.Kid
 import com.graberhub.companion.data.models.KidConfig
-import com.graberhub.companion.ui.components.*
+import com.graberhub.companion.ui.components.EmojiPickerDialog
 import com.graberhub.companion.ui.theme.*
 import com.graberhub.companion.viewmodel.MainViewModel
 
 @Composable
 fun ChoresScreen(viewModel: MainViewModel) {
-    val kids by viewModel.kids.collectAsState()
-    val kidsConfig by viewModel.kidsConfig.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-
-    var showAddDialog by remember { mutableStateOf(false) }
-    var selectedKidForAdd by remember { mutableIntStateOf(-1) }
+    val kids by viewModel.kids.collectAsStateWithLifecycle()
+    val kidsConfig by viewModel.kidsConfig.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    var showAddDialog by remember { mutableStateOf<Kid?>(null) }
     var editingChore by remember { mutableStateOf<Chore?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SectionHeader("✅ Chores")
-            IconButton(onClick = { viewModel.loadDashboard() }) {
-                Icon(Icons.Default.Refresh, "Refresh", tint = ShedBlue)
-            }
-        }
-
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (isLoading && kids.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = ShedBlue)
             }
-        } else if (kids.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("✅", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("No kids/chores loaded", color = TextSecondary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { viewModel.loadDashboard() },
-                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
-                    ) {
-                        Text("Refresh", color = Color.White)
-                    }
-                }
-            }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                items(kids, key = { it.id }) { kid ->
-                    val config = kidsConfig.find { it.id == kid.id }
-                    val kidColor = parseColor(config?.color ?: kid.color.ifEmpty { "#03a9f4" })
-
-                    KidChoresCard(
-                        kid = kid,
-                        kidColor = kidColor,
-                        onToggle = { choreId -> viewModel.toggleChore(choreId) },
-                        onAdd = { selectedKidForAdd = kid.id; showAddDialog = true },
-                        onEdit = { chore -> editingChore = chore },
-                        onDelete = { choreId -> viewModel.deleteChore(choreId) }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Text(
+                        "✅ Chores",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
                     )
                 }
+
+                items(kids, key = { it.id }) { kid ->
+                    val kidColor = kidsConfig.find { it.id == kid.id }?.color ?: kid.color
+                    val color = try {
+                        Color(android.graphics.Color.parseColor(kidColor))
+                    } catch (_: Exception) { ShedBlue }
+
+                    KidChoreCard(
+                        kid = kid,
+                        kidColor = color,
+                        onToggleChore = { viewModel.toggleChore(it.id) },
+                        onAddChore = { showAddDialog = kid },
+                        onEditChore = { editingChore = it },
+                        onDeleteChore = { viewModel.deleteChore(it.id) }
+                    )
+                }
+
+                item { Spacer(Modifier.height(80.dp)) }
             }
         }
     }
 
-    if (showAddDialog && selectedKidForAdd > 0) {
+    // Add chore dialog
+    showAddDialog?.let { kid ->
         ChoreDialog(
-            kidName = kids.find { it.id == selectedKidForAdd }?.name ?: "",
+            kidName = kid.name,
+            chore = null,
             onSave = { title, emoji ->
-                viewModel.addChore(selectedKidForAdd, title, emoji)
+                viewModel.addChore(kid.id, title, emoji)
+                showAddDialog = null
             },
-            onDismiss = { showAddDialog = false; selectedKidForAdd = -1 }
+            onDismiss = { showAddDialog = null }
         )
     }
 
+    // Edit chore dialog
     editingChore?.let { chore ->
         ChoreDialog(
-            initialTitle = chore.title,
-            initialEmoji = chore.emoji,
-            kidName = kids.find { it.id == chore.kid_id }?.name ?: "",
+            kidName = null,
+            chore = chore,
             onSave = { title, emoji ->
                 viewModel.editChore(chore.id, title, emoji)
+                editingChore = null
             },
             onDismiss = { editingChore = null }
         )
@@ -111,26 +109,27 @@ fun ChoresScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-private fun KidChoresCard(
+private fun KidChoreCard(
     kid: Kid,
     kidColor: Color,
-    onToggle: (Int) -> Unit,
-    onAdd: () -> Unit,
-    onEdit: (Chore) -> Unit,
-    onDelete: (Int) -> Unit
+    onToggleChore: (Chore) -> Unit,
+    onAddChore: () -> Unit,
+    onEditChore: (Chore) -> Unit,
+    onDeleteChore: (Chore) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        elevation = CardDefaults.cardElevation(2.dp)
+        color = CardBackground
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Kid header
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -141,39 +140,41 @@ private fun KidChoresCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            kid.name.take(1).uppercase(),
+                            kid.name.first().uppercase(),
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(kid.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
-
-                    if (kid.chores.isNotEmpty()) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val done = kid.chores.count { it.done }
-                        Text(
-                            "$done/${kid.chores.size}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (done == kid.chores.size) CheckGreen else TextSecondary
-                        )
-                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        kid.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-                IconButton(onClick = onAdd) {
-                    Icon(Icons.Default.Add, "Add chore", tint = kidColor)
+                IconButton(onClick = onAddChore) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Chore", tint = kidColor)
                 }
             }
 
-            if (kid.chores.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+            if (kid.chores.isEmpty()) {
+                Text(
+                    "No chores yet — tap + to add one",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextHint,
+                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
+                )
+            } else {
+                Spacer(Modifier.height(8.dp))
                 kid.chores.forEach { chore ->
                     ChoreItem(
                         chore = chore,
                         kidColor = kidColor,
-                        onToggle = { onToggle(chore.id) },
-                        onEdit = { onEdit(chore) },
-                        onDelete = { onDelete(chore.id) }
+                        onToggle = { onToggleChore(chore) },
+                        onEdit = { onEditChore(chore) },
+                        onDelete = { onDeleteChore(chore) }
                     )
                 }
             }
@@ -189,129 +190,153 @@ private fun ChoreItem(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val bgColor by animateColorAsState(
+        if (chore.done) CheckGreenLight else BackgroundGray,
+        label = "choreBg"
+    )
 
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 3.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = bgColor
     ) {
-        // Checkbox
-        Box(
+        Row(
             modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (chore.done) CheckGreen else BackgroundGray)
-                .clickable(onClick = onToggle),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .clickable { onToggle() }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (chore.done) {
-                Icon(Icons.Default.Check, "Done", tint = Color.White, modifier = Modifier.size(18.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        if (chore.emoji.isNotEmpty()) {
-            Text(chore.emoji, fontSize = 18.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-
-        Text(
-            chore.title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (chore.done) TextHint else TextPrimary,
-            textDecoration = if (chore.done) TextDecoration.LineThrough else TextDecoration.None,
-            modifier = Modifier.weight(1f)
-        )
-
-        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Edit, "Edit", tint = TextHint, modifier = Modifier.size(16.dp))
-        }
-        IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Delete, "Delete", tint = TextHint, modifier = Modifier.size(16.dp))
-        }
-    }
-
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Chore") },
-            text = { Text("Remove \"${chore.title}\"?") },
-            confirmButton = {
-                Button(
-                    onClick = { onDelete(); showDeleteConfirm = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = ShedPink)
-                ) { Text("Delete", color = Color.White) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel", color = TextSecondary)
+            // Checkbox
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(if (chore.done) CheckGreen else Color.Transparent)
+                    .then(
+                        if (!chore.done) Modifier.background(Color.Transparent)
+                            .clip(CircleShape)
+                            .background(BorderLight)
+                        else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (chore.done) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
-        )
+
+            Spacer(Modifier.width(10.dp))
+
+            // Emoji
+            if (chore.emoji.isNotEmpty()) {
+                Text(chore.emoji, fontSize = 18.sp)
+                Spacer(Modifier.width(6.dp))
+            }
+
+            // Title
+            Text(
+                chore.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (chore.done) TextSecondary else TextPrimary,
+                textDecoration = if (chore.done) TextDecoration.LineThrough else null,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Edit / Delete
+            IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextHint, modifier = Modifier.size(16.dp))
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = TextHint, modifier = Modifier.size(16.dp))
+            }
+        }
     }
 }
 
 @Composable
-fun ChoreDialog(
-    initialTitle: String = "",
-    initialEmoji: String = "",
-    kidName: String = "",
-    onSave: (String, String) -> Unit,
+private fun ChoreDialog(
+    kidName: String?,
+    chore: Chore?,
+    onSave: (title: String, emoji: String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var title by remember { mutableStateOf(initialTitle) }
-    var emoji by remember { mutableStateOf(initialEmoji) }
+    var title by remember { mutableStateOf(chore?.title ?: "") }
+    var emoji by remember { mutableStateOf(chore?.emoji ?: "") }
     var showEmojiPicker by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (initialTitle.isEmpty()) "Add Chore for $kidName" else "Edit Chore") },
-        text = {
-            Column {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = CardBackground
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    if (chore != null) "Edit Chore" else "Add Chore for ${kidName ?: ""}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TextPrimary
+                )
+
+                Spacer(Modifier.height(16.dp))
+
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Chore name") },
+                    label = { Text("Chore Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Emoji: ", color = TextSecondary)
-                    Text(emoji.ifEmpty { "None" }, fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OutlinedButton(onClick = { showEmojiPicker = true }) {
-                        Text("Choose")
-                    }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Emoji selector
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(BackgroundGray)
+                        .clickable { showEmojiPicker = true }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (emoji.isNotEmpty()) "$emoji  Tap to change" else "Choose Emoji (optional)",
+                        fontSize = if (emoji.isNotEmpty()) 16.sp else 14.sp,
+                        color = if (emoji.isNotEmpty()) TextPrimary else TextHint
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (title.isNotBlank()) onSave(title, emoji)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                        enabled = title.isNotBlank()
+                    ) { Text("Save") }
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (title.isNotBlank()) {
-                        onSave(title, emoji)
-                        onDismiss()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
-            ) { Text("Save", color = Color.White) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondary)
-            }
         }
-    )
+    }
 
     if (showEmojiPicker) {
         EmojiPickerDialog(
-            selected = emoji,
-            onSelect = { emoji = it },
+            selectedEmoji = emoji,
+            onEmojiSelected = { emoji = it },
             onDismiss = { showEmojiPicker = false }
         )
     }

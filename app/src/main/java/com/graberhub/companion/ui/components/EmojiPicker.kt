@@ -25,39 +25,63 @@ data class EmojiCategory(
     val emojis: List<String>
 )
 
-val EMOJI_CATEGORIES = listOf(
-    EmojiCategory("Chores", "🧹", listOf("🧹", "🧽", "🧺", "🪣", "🧴", "🗑️", "🪥", "🧼", "🫧", "🪠", "🧤", "🪒", "✨", "💫", "🪄")),
-    EmojiCategory("Food", "🍳", listOf("🍳", "🥣", "🍽️", "🧑‍🍳", "🥪", "🍕", "🥗", "🧁", "🍎", "🥤", "☕", "🧃", "🍪", "🥞", "🌮")),
-    EmojiCategory("School", "📚", listOf("📚", "📖", "✏️", "📝", "🎒", "🖊️", "📐", "🧮", "💻", "🎓", "📓", "🔬", "🌎", "🧠", "📏")),
-    EmojiCategory("Sports", "⚽", listOf("⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏊", "🚴", "🏃", "🧘", "💪", "🤸", "🎯", "🏋️", "⛹️")),
-    EmojiCategory("Animals", "🐕", listOf("🐕", "🐈", "🐟", "🐦", "🐰", "🐹", "🦎", "🌱", "🌻", "🌳", "🪴", "🦋", "🐝", "🐢", "🐾")),
-    EmojiCategory("Home", "🏠", listOf("🏠", "🛏️", "🛋️", "🚿", "🪟", "🚪", "🪑", "💡", "📺", "🧸", "👨‍👩‍👧‍👦", "❤️", "🫂", "🙏", "✝️")),
-    EmojiCategory("Time", "⏰", listOf("⏰", "🌅", "🌙", "⭐", "☀️", "🌧️", "❄️", "🌈", "🕐", "📅", "🔔", "⏳", "🌤️", "🌊", "🌸")),
-    EmojiCategory("Fun", "🎮", listOf("🎮", "🎨", "🎵", "🎬", "📱", "🎭", "🎪", "🎉", "🏆", "⭐", "🌟", "💎", "👑", "🎁", "🥇"))
+val emojiCategories = listOf(
+    EmojiCategory("Smileys", "😊", listOf(
+        "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "😊",
+        "😇", "🥰", "😍", "🤩", "😘", "😎", "🤓", "🧐", "😏", "😴"
+    )),
+    EmojiCategory("Activities", "⚽", listOf(
+        "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🎱", "🏓", "🏸", "🥅",
+        "⛳", "🎣", "🤿", "🎿", "⛷️", "🏂", "🏋️", "🤸", "🚴", "🏊"
+    )),
+    EmojiCategory("Food", "🍎", listOf(
+        "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍒",
+        "🍕", "🍔", "🌮", "🍣", "🍜", "🧁", "🍰", "🍪", "🍩", "🍫"
+    )),
+    EmojiCategory("Animals", "🐶", listOf(
+        "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯",
+        "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🦄", "🐝"
+    )),
+    EmojiCategory("Travel", "✈️", listOf(
+        "🚗", "🚕", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "✈️", "🚀",
+        "🛸", "🚁", "⛵", "🚢", "🏠", "🏰", "⛪", "🏫", "🏛️", "🗼"
+    )),
+    EmojiCategory("Objects", "💡", listOf(
+        "⌚", "📱", "💻", "⌨️", "🖥️", "📷", "📺", "🔦", "💡", "🔑",
+        "📚", "✏️", "📐", "🎒", "👑", "💎", "🔔", "🎵", "🎨", "🧸"
+    )),
+    EmojiCategory("Symbols", "❤️", listOf(
+        "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💯", "✨",
+        "⭐", "🌟", "💫", "🔥", "💧", "🌈", "☀️", "🌙", "⚡", "❄️"
+    )),
+    EmojiCategory("Hands", "👍", listOf(
+        "👍", "👎", "👊", "✊", "🤛", "🤜", "👏", "🙌", "🤝", "🙏",
+        "✌️", "🤞", "🤟", "🤘", "👌", "🤌", "👈", "👉", "👆", "👇"
+    ))
 )
 
 @Composable
 fun EmojiPickerDialog(
-    selected: String,
-    onSelect: (String) -> Unit,
+    selectedEmoji: String,
+    onEmojiSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedCategory by remember { mutableIntStateOf(0) }
-    val category = EMOJI_CATEGORIES[selectedCategory]
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = CardBackground,
-            tonalElevation = 8.dp,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 450.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = CardBackground
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Choose Emoji",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "Choose Emoji",
+                    style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
 
                 // Category tabs
@@ -67,10 +91,10 @@ fun EmojiPickerDialog(
                         .padding(bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    EMOJI_CATEGORIES.forEachIndexed { index, cat ->
+                    emojiCategories.forEachIndexed { index, category ->
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(
                                     if (index == selectedCategory) ShedBlueLight
@@ -79,41 +103,34 @@ fun EmojiPickerDialog(
                                 .clickable { selectedCategory = index },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(cat.icon, fontSize = 20.sp)
+                            Text(text = category.icon, fontSize = 18.sp)
                         }
                     }
                 }
 
-                Text(
-                    category.name,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
                 // Emoji grid
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(5),
-                    modifier = Modifier.height(200.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(category.emojis) { emoji ->
+                    items(emojiCategories[selectedCategory].emojis) { emoji ->
                         Box(
                             modifier = Modifier
                                 .aspectRatio(1f)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    if (emoji == selected) ShedBlueLight
+                                    if (emoji == selectedEmoji) ShedBlueLight
                                     else BackgroundGray
                                 )
                                 .clickable {
-                                    onSelect(emoji)
+                                    onEmojiSelected(emoji)
                                     onDismiss()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(emoji, fontSize = 24.sp, textAlign = TextAlign.Center)
+                            Text(text = emoji, fontSize = 24.sp, textAlign = TextAlign.Center)
                         }
                     }
                 }
@@ -121,12 +138,14 @@ fun EmojiPickerDialog(
                 // Clear button
                 TextButton(
                     onClick = {
-                        onSelect("")
+                        onEmojiSelected("")
                         onDismiss()
                     },
-                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp)
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(top = 8.dp)
                 ) {
-                    Text("Clear", color = TextSecondary)
+                    Text("Clear")
                 }
             }
         }
