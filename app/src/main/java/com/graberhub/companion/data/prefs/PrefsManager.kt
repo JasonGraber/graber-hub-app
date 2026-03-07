@@ -13,7 +13,10 @@ class PrefsManager(context: Context) {
     companion object {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_KIDS = "kids_config"
-        private const val DEFAULT_SERVER = "http://192.168.86.43"
+
+        const val HOME_URL = "http://192.168.86.43/"
+        const val TAILSCALE_URL = "http://100.72.250.82/"
+        const val DEFAULT_SERVER = HOME_URL
 
         val DEFAULT_KIDS = listOf(
             KidConfig(1, "Aurora", "#ec5281"),
@@ -24,10 +27,25 @@ class PrefsManager(context: Context) {
     }
 
     var serverUrl: String
-        get() = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER) ?: DEFAULT_SERVER
-        set(value) {
-            prefs.edit().putString(KEY_SERVER_URL, value.trimEnd('/')).apply()
+        get() {
+            val url = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER) ?: DEFAULT_SERVER
+            // Always ensure trailing slash for Retrofit
+            return if (url.endsWith("/")) url else "$url/"
         }
+        set(value) {
+            // Store with trailing slash to avoid issues
+            val url = if (value.endsWith("/")) value else "$value/"
+            prefs.edit().putString(KEY_SERVER_URL, url).apply()
+        }
+
+    val isHomeNetwork: Boolean
+        get() = serverUrl == HOME_URL
+
+    val isTailscaleNetwork: Boolean
+        get() = serverUrl == TAILSCALE_URL
+
+    val alternateUrl: String
+        get() = if (isHomeNetwork) TAILSCALE_URL else HOME_URL
 
     var kidsConfig: List<KidConfig>
         get() {

@@ -22,6 +22,10 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class ConnectionState {
+    UNKNOWN, CONNECTING, CONNECTED, FAILED
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val prefs = PrefsManager(application)
@@ -49,6 +53,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _connectionStatus = MutableStateFlow<String?>(null)
     val connectionStatus: StateFlow<String?> = _connectionStatus.asStateFlow()
+
+    private val _connectionState = MutableStateFlow(ConnectionState.UNKNOWN)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val _activeNetwork = MutableStateFlow<String?>(null)
+    val activeNetwork: StateFlow<String?> = _activeNetwork.asStateFlow()
 
     private val _kidsConfig = MutableStateFlow(prefs.kidsConfig)
     val kidsConfig: StateFlow<List<KidConfig>> = _kidsConfig.asStateFlow()
@@ -82,8 +92,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        initRetrofit()
-        loadDashboard()
+        updateActiveNetworkLabel()
+        connectWithFallback()
         loadTimer()
 
         val filter = IntentFilter(AlarmService.ACTION_STOP)
@@ -102,7 +112,68 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun initRetrofit() {
-        RetrofitClient.init(prefs.serverUrl)
+        val url = prefs.serverUrl
+        Log.d("MainViewModel", "initRetrofit() with url=$url")
+        RetrofitClient.init(url)
+    }
+
+    private fun updateActiveNetworkLabel() {
+        _activeNetwork.value = when (prefs.serverUrl) {
+            PrefsManager.HOME_URL -> "home"
+            PrefsManager.TAILSCALE_URL -> "tailscale"
+            else -> "custom"
+        }
+    }
+
+    /**
+     * Auto-fallback connection logic:
+     * 1. Try saved URL
+     * 2. If fails, try alternate URL
+     * 3. If alternate works, save it
+     * 4. If both fail, show error
+     */
+    private fun connectWithFallback() {
+        viewModelScope.launch {
+            _connectionState.value = ConnectionState.CONNECTING
+            _connectionStatus.value = "Connecting..."
+
+            // Try saved URL first
+            val savedUrl = prefs.serverUrl
+            Log.d("MainViewModel", "connectWithFallback: trying saved URL=$savedUrl")
+            RetrofitClient.init(savedUrl)
+
+            if (RetrofitClient.testConnection()) {
+                Log.d("MainViewModel", "connectWithFallback: saved URL connected!")
+                _connectionState.value = ConnectionState.CONNECTED
+                _connectionStatus.value = "✓ Connected"
+                updateActiveNetworkLabel()
+                loadDashboard()
+                return@launch
+            }
+
+            // Try alternate URL
+            val altUrl = prefs.alternateUrl
+            Log.d("MainViewModel", "connectWithFallback: saved URL failed, trying alternate=$altUrl")
+            RetrofitClient.init(altUrl)
+
+            if (RetrofitClient.testConnection()) {
+                Log.d("MainViewModel", "connectWithFallback: alternate URL connected!")
+                prefs.serverUrl = altUrl
+                _connectionState.value = ConnectionState.CONNECTED
+                _connectionStatus.value = "✓ Connected (switched network)"
+                updateActiveNetworkLabel()
+                loadDashboard()
+                return@launch
+            }
+
+            // Both failed
+            Log.d("MainViewModel", "connectWithFallback: both URLs failed")
+            // Reset to saved URL
+            RetrofitClient.init(savedUrl)
+            _connectionState.value = ConnectionState.FAILED
+            _connectionStatus.value = "✗ Connection failed"
+            _error.value = "Cannot reach server. Check your network."
+        }
     }
 
     fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
@@ -122,11 +193,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _countdowns.value = dashboard.countdowns
                         _verse.value = dashboard.verse
                     }
+                    _connectionState.value = ConnectionState.CONNECTED
                 } else {
                     _error.value = "Server error: ${response.code()}"
                 }
             } catch (e: Exception) {
                 _error.value = "Connection failed: ${e.message}"
+                _connectionState.value = ConnectionState.FAILED
             } finally {
                 _isLoading.value = false
             }
@@ -407,14 +480,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateServerUrl(url: String) {
         prefs.serverUrl = url
-        RetrofitClient.init(url)
+        RetrofitClient.init(prefs.serverUrl)
+        updateActiveNetworkLabel()
         loadDashboard()
+    }
+
+    /**
+     * Quick-switch to a specific network URL.
+     * Saves, reinitializes Retrofit, tests connection, reloads if connected.
+     */
+    fun switchNetwork(url: String) {
+        viewModelScope.launch {
+            _connectionState.value = ConnectionState.CONNECTING
+            _connectionStatus.value = "Connecting..."
+
+            prefs.serverUrl = url
+            RetrofitClient.init(prefs.serverUrl)
+            updateActiveNetworkLabel()
+
+            val ok = RetrofitClient.testConnection()
+            if (ok) {
+                _connectionState.value = ConnectionState.CONNECTED
+                _connectionStatus.value = "✓ Connected"
+                loadDashboard()
+            } else {
+                _connectionState.value = ConnectionState.FAILED
+                _connectionStatus.value = "✗ Connection failed"
+            }
+        }
+    }
+
+    fun reconnect() {
+        connectWithFallback()
     }
 
     fun testConnection() {
         viewModelScope.launch {
+            _connectionState.value = ConnectionState.CONNECTING
             _connectionStatus.value = "Testing..."
             val ok = RetrofitClient.testConnection()
+            _connectionState.value = if (ok) ConnectionState.CONNECTED else ConnectionState.FAILED
             _connectionStatus.value = if (ok) "✓ Connected" else "✗ Failed"
         }
     }

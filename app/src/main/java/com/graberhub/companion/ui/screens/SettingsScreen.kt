@@ -6,13 +6,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,13 +25,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.graberhub.companion.data.models.Verse
+import com.graberhub.companion.data.prefs.PrefsManager
 import com.graberhub.companion.ui.components.ColorPickerDialog
 import com.graberhub.companion.ui.theme.*
+import com.graberhub.companion.viewmodel.ConnectionState
 import com.graberhub.companion.viewmodel.MainViewModel
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
     val connectionStatus by viewModel.connectionStatus.collectAsStateWithLifecycle()
+    val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val activeNetwork by viewModel.activeNetwork.collectAsStateWithLifecycle()
     val kidsConfig by viewModel.kidsConfig.collectAsStateWithLifecycle()
     val verses by viewModel.verses.collectAsStateWithLifecycle()
     val photoSettings by viewModel.photoSettings.collectAsStateWithLifecycle()
@@ -52,6 +55,11 @@ fun SettingsScreen(viewModel: MainViewModel) {
         photoSettings?.album_url?.let { albumUrl = it }
     }
 
+    // Keep serverUrl in sync when network switches
+    LaunchedEffect(activeNetwork) {
+        serverUrl = viewModel.prefs.serverUrl
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -67,7 +75,144 @@ fun SettingsScreen(viewModel: MainViewModel) {
             )
         }
 
-        // Server URL section
+        // Network Quick-Switch
+        item {
+            SettingsCard(title = "📡 Network") {
+                // Connection status indicator
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Status dot
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (connectionState) {
+                                    ConnectionState.CONNECTED -> CheckGreen
+                                    ConnectionState.CONNECTING -> Color(0xFFFFA726) // Orange
+                                    ConnectionState.FAILED -> ShedPink
+                                    ConnectionState.UNKNOWN -> TextHint
+                                }
+                            )
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        when (connectionState) {
+                            ConnectionState.CONNECTED -> "Connected"
+                            ConnectionState.CONNECTING -> "Connecting..."
+                            ConnectionState.FAILED -> "Disconnected"
+                            ConnectionState.UNKNOWN -> "Unknown"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = when (connectionState) {
+                            ConnectionState.CONNECTED -> CheckGreen
+                            ConnectionState.CONNECTING -> Color(0xFFFFA726)
+                            ConnectionState.FAILED -> ShedPink
+                            ConnectionState.UNKNOWN -> TextSecondary
+                        },
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.weight(1f))
+                    connectionStatus?.let { status ->
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+
+                // Quick-switch buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val isHome = activeNetwork == "home"
+                    val isTailscale = activeNetwork == "tailscale"
+
+                    // Home button
+                    Button(
+                        onClick = { viewModel.switchNetwork(PrefsManager.HOME_URL) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .then(
+                                if (isHome) Modifier.border(2.dp, ShedBlueDark, RoundedCornerShape(12.dp))
+                                else Modifier
+                            ),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isHome) ShedBlue else BackgroundGray,
+                            contentColor = if (isHome) Color.White else TextPrimary
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = if (isHome) 4.dp else 0.dp
+                        )
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("🏠", fontSize = 18.sp)
+                            Text(
+                                "Home",
+                                fontSize = 12.sp,
+                                fontWeight = if (isHome) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+
+                    // Tailscale button
+                    Button(
+                        onClick = { viewModel.switchNetwork(PrefsManager.TAILSCALE_URL) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .then(
+                                if (isTailscale) Modifier.border(2.dp, ShedBlueDark, RoundedCornerShape(12.dp))
+                                else Modifier
+                            ),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isTailscale) ShedBlue else BackgroundGray,
+                            contentColor = if (isTailscale) Color.White else TextPrimary
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = if (isTailscale) 4.dp else 0.dp
+                        )
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("🌐", fontSize = 18.sp)
+                            Text(
+                                "Tailscale",
+                                fontSize = 12.sp,
+                                fontWeight = if (isTailscale) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Reconnect button
+                OutlinedButton(
+                    onClick = { viewModel.reconnect() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = connectionState != ConnectionState.CONNECTING
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Reconnect",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("🔄 Reconnect")
+                }
+            }
+        }
+
+        // Server URL section (advanced)
         item {
             SettingsCard(title = "🌐 Server Connection") {
                 OutlinedTextField(
@@ -82,31 +227,15 @@ fun SettingsScreen(viewModel: MainViewModel) {
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    // Connection status
-                    connectionStatus?.let { status ->
-                        Text(
-                            status,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = when {
-                                status.contains("✓") -> CheckGreen
-                                status.contains("✗") -> ShedPink
-                                else -> TextSecondary
-                            }
-                        )
-                    }
-
-                    Row {
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.updateServerUrl(serverUrl)
-                                viewModel.testConnection()
-                            }
-                        ) {
-                            Text("Save & Test")
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.updateServerUrl(serverUrl)
+                            viewModel.testConnection()
                         }
+                    ) {
+                        Text("Save & Test")
                     }
                 }
             }
@@ -336,7 +465,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Version", color = TextSecondary)
-                    Text("1.1.0", color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("1.1.1", color = TextPrimary, fontWeight = FontWeight.Medium)
                 }
             }
         }
