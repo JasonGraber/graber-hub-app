@@ -236,9 +236,9 @@ fun TimerScreen(viewModel: MainViewModel) {
         }
     }
 
-    // Time picker dialog
+    // Clock-style time picker dialog for timer duration
     if (showTimePicker) {
-        MinutePickerDialog(
+        TimerDurationPickerDialog(
             initialMinutes = selectedMinutes,
             onMinutesSelected = {
                 selectedMinutes = it
@@ -249,13 +249,21 @@ fun TimerScreen(viewModel: MainViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MinutePickerDialog(
+private fun TimerDurationPickerDialog(
     initialMinutes: Int,
     onMinutesSelected: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var minutes by remember { mutableIntStateOf(initialMinutes) }
+    val initialHour = initialMinutes / 60
+    val initialMin = initialMinutes % 60
+
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMin,
+        is24Hour = true
+    )
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -263,44 +271,37 @@ private fun MinutePickerDialog(
             color = CardBackground
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Set Timer",
+                    "Set Timer Duration",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = TextPrimary
+                    color = TextPrimary,
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
 
-                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Hours : Minutes",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        TextButton(onClick = { minutes = (minutes + 5).coerceAtMost(180) }) {
-                            Text("▲", fontSize = 24.sp)
-                        }
-                        Text(
-                            "$minutes",
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = ShedBlue
-                        )
-                        TextButton(onClick = { minutes = (minutes - 5).coerceAtLeast(1) }) {
-                            Text("▼", fontSize = 24.sp)
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "min",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextSecondary
+                TimePicker(
+                    state = timePickerState,
+                    colors = TimePickerDefaults.colors(
+                        clockDialColor = BackgroundGray,
+                        selectorColor = ShedBlue,
+                        containerColor = CardBackground,
+                        timeSelectorSelectedContainerColor = ShedBlueLight,
+                        timeSelectorSelectedContentColor = ShedBlue,
+                        timeSelectorUnselectedContainerColor = BackgroundGray,
+                        timeSelectorUnselectedContentColor = TextPrimary
                     )
-                }
+                )
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -309,7 +310,10 @@ private fun MinutePickerDialog(
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(Modifier.width(8.dp))
                     Button(
-                        onClick = { onMinutesSelected(minutes) },
+                        onClick = {
+                            val totalMinutes = timePickerState.hour * 60 + timePickerState.minute
+                            onMinutesSelected(totalMinutes.coerceAtLeast(1))
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
                     ) { Text("OK") }
                 }

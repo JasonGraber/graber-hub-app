@@ -2,10 +2,12 @@ package com.graberhub.companion.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -26,37 +28,94 @@ data class EmojiCategory(
 )
 
 val emojiCategories = listOf(
-    EmojiCategory("Smileys", "😊", listOf(
+    EmojiCategory("Smileys & People", "😀", listOf(
         "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "😊",
-        "😇", "🥰", "😍", "🤩", "😘", "😎", "🤓", "🧐", "😏", "😴"
+        "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "🥲", "😋",
+        "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "😐",
+        "😑", "😶", "😏", "😒", "🙄", "😬", "🤥", "😌", "😔", "😪",
+        "🤤", "😴", "😷", "🤒", "🤕", "🤧", "🥵", "🥶", "🥴", "😵",
+        "🤯", "🤠", "🥳", "🥸", "😎", "🤓", "🧐"
     )),
-    EmojiCategory("Activities", "⚽", listOf(
-        "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🎱", "🏓", "🏸", "🥅",
-        "⛳", "🎣", "🤿", "🎿", "⛷️", "🏂", "🏋️", "🤸", "🚴", "🏊"
-    )),
-    EmojiCategory("Food", "🍎", listOf(
-        "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍒",
-        "🍕", "🍔", "🌮", "🍣", "🍜", "🧁", "🍰", "🍪", "🍩", "🍫"
-    )),
-    EmojiCategory("Animals", "🐶", listOf(
+    EmojiCategory("Animals & Nature", "🐶", listOf(
         "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯",
-        "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🦄", "🐝"
+        "🦁", "🐮", "🐷", "🐸", "🐵", "🙈", "🙉", "🙊", "🐔", "🐧",
+        "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄",
+        "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🪲", "🐢", "🐍", "🦎",
+        "🐙", "🦑", "🦐", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋",
+        "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏",
+        "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏",
+        "🐑", "🐐", "🦌", "🐕", "🐩", "🦮", "🐈", "🪶", "🌸", "🌺",
+        "🌻", "🌹", "🌷", "🌼", "🌿", "🍀", "🍁", "🍂", "🌲", "🌳",
+        "🌴", "🌵", "🪴", "🎋", "🎍", "🍃"
     )),
-    EmojiCategory("Travel", "✈️", listOf(
-        "🚗", "🚕", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "✈️", "🚀",
-        "🛸", "🚁", "⛵", "🚢", "🏠", "🏰", "⛪", "🏫", "🏛️", "🗼"
+    EmojiCategory("Food & Drink", "🍎", listOf(
+        "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍒",
+        "🍑", "🥭", "🍍", "🥥", "🥝", "🍅", "🥑", "🥦", "🥬", "🥒",
+        "🌽", "🥕", "🧄", "🧅", "🥔", "🍠", "🥐", "🍞", "🥖", "🧀",
+        "🍳", "🥞", "🧇", "🥓", "🍕", "🍔", "🍟", "🌮", "🌯", "🫔",
+        "🥗", "🍝", "🍜", "🍲", "🍣", "🍱", "🥟", "🍤", "🍙", "🍚",
+        "🧁", "🍰", "🎂", "🍮", "🍭", "🍬", "🍫", "🍩", "🍪", "🍿",
+        "☕", "🍵", "🧃", "🥤", "🧋", "🍶", "🍷", "🥛", "💧"
+    )),
+    EmojiCategory("Activities & Sports", "⚽", listOf(
+        "⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱",
+        "🏓", "🏸", "🏒", "🥍", "🥅", "⛳", "🏹", "🎣", "🤿", "🥊",
+        "🥋", "🎿", "⛷️", "🏂", "🏋️", "🤸", "🤼", "🤽", "🤺", "🏇",
+        "🚴", "🏊", "🤾", "🧗", "🏄", "⛹️", "🛹", "🛼", "🎮", "🕹️",
+        "🎲", "🧩", "♟️", "🎯", "🎳", "🪁"
+    )),
+    EmojiCategory("Travel & Places", "🚗", listOf(
+        "🚗", "🚕", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "🚐", "🛻",
+        "🚚", "🚛", "🚜", "🏍️", "🛵", "🚲", "✈️", "🛩️", "🚀", "🛸",
+        "🚁", "⛵", "🚢", "🛥️", "🛶", "🚂", "🚆", "🚇", "🏠", "🏡",
+        "🏰", "🏯", "⛪", "🕌", "🏫", "🏢", "🏛️", "🗼", "🗽", "⛲",
+        "🎢", "🎡", "🎠", "🏖️", "🏝️", "🏔️", "⛰️", "🌋", "🗻", "🏕️",
+        "🌅", "🌄", "🌠", "🎇", "🎆", "🌉", "🌌"
     )),
     EmojiCategory("Objects", "💡", listOf(
-        "⌚", "📱", "💻", "⌨️", "🖥️", "📷", "📺", "🔦", "💡", "🔑",
-        "📚", "✏️", "📐", "🎒", "👑", "💎", "🔔", "🎵", "🎨", "🧸"
+        "⌚", "📱", "💻", "⌨️", "🖥️", "🖨️", "📷", "📹", "📺", "📻",
+        "🔦", "💡", "🔑", "🗝️", "🔒", "🔓", "📦", "✉️", "📫", "📪",
+        "📬", "🛒", "🎁", "🎀", "🏷️", "💰", "💳", "💎", "⚖️", "🧲",
+        "🔧", "🔨", "🪛", "🪚", "🔩", "🧰", "🗑️", "🧸", "🪞", "🪆",
+        "🧴", "🧹", "🧺", "🧻", "🪣", "🧼", "🫧", "🪥", "💊", "🩹",
+        "🩺", "🔬", "🔭", "📡"
     )),
-    EmojiCategory("Symbols", "❤️", listOf(
-        "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💯", "✨",
-        "⭐", "🌟", "💫", "🔥", "💧", "🌈", "☀️", "🌙", "⚡", "❄️"
+    EmojiCategory("Symbols & Hearts", "❤️", listOf(
+        "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔",
+        "❤️‍🔥", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💯", "✨",
+        "⭐", "🌟", "💫", "🔥", "💧", "🌈", "☀️", "🌙", "⚡", "❄️",
+        "☁️", "🌊", "✅", "❌", "❓", "❕", "‼️", "⁉️", "♻️", "✝️",
+        "☮️", "🕊️", "🏳️", "🚩", "🎌"
     )),
-    EmojiCategory("Hands", "👍", listOf(
+    EmojiCategory("Music & Arts", "🎵", listOf(
+        "🎵", "🎶", "🎼", "🎤", "🎧", "🎷", "🎸", "🎹", "🪗", "🥁",
+        "🪘", "🎺", "🎻", "🪕", "🎨", "🖌️", "🖍️", "✏️", "🖊️", "📝",
+        "🎭", "🎬", "🎥", "📸", "🎞️", "📽️", "🎪", "🤹"
+    )),
+    EmojiCategory("Education", "📚", listOf(
+        "📚", "📖", "📕", "📗", "📘", "📙", "📓", "📒", "📃", "📜",
+        "📄", "📑", "🔖", "🏫", "🎓", "✏️", "📐", "📏", "🧮", "🔬",
+        "🔭", "🧪", "🧬", "📊", "📈", "📉", "🗂️", "📋", "📌", "📍"
+    )),
+    EmojiCategory("Home & Family", "🏠", listOf(
+        "🏠", "🏡", "🛏️", "🛋️", "🪑", "🚪", "🪟", "🧱", "🏗️", "👨‍👩‍👧‍👦",
+        "👨‍👩‍👧", "👨‍👩‍👦", "👩‍👧‍👦", "👶", "🧒", "👦", "👧", "👨", "👩", "🧑",
+        "👴", "👵", "🐕", "🐈", "🍽️", "🧹", "🧺", "🛁", "🚿", "🪥"
+    )),
+    EmojiCategory("Time & Calendar", "⏰", listOf(
+        "⏰", "⏱️", "⏳", "⌛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕",
+        "🕖", "🕗", "🕘", "🕙", "🕚", "🕛", "📅", "📆", "🗓️", "📇",
+        "🔔", "🔕", "⏸️", "▶️", "⏹️", "⏭️", "⏮️", "🔄", "🔁", "🔂"
+    )),
+    EmojiCategory("Fitness & Health", "💪", listOf(
+        "💪", "🏋️", "🏃", "🚴", "🧘", "🤸", "🏊", "🚶", "🧗", "🤾",
+        "⛹️", "🏌️", "🤺", "🥇", "🥈", "🥉", "🏅", "🏆", "🩺", "💊",
+        "🩹", "🧬", "🥗", "🥤", "💧", "😴", "🧠", "❤️", "🫀", "🫁"
+    )),
+    EmojiCategory("Hands & Gestures", "👍", listOf(
         "👍", "👎", "👊", "✊", "🤛", "🤜", "👏", "🙌", "🤝", "🙏",
-        "✌️", "🤞", "🤟", "🤘", "👌", "🤌", "👈", "👉", "👆", "👇"
+        "✌️", "🤞", "🤟", "🤘", "👌", "🤌", "👈", "👉", "👆", "👇",
+        "☝️", "✋", "🤚", "🖐️", "🖖", "👋", "🤙", "💅", "🙏", "🫶"
     ))
 )
 
@@ -67,12 +126,13 @@ fun EmojiPickerDialog(
     onDismiss: () -> Unit
 ) {
     var selectedCategory by remember { mutableIntStateOf(0) }
+    val tabScrollState = rememberScrollState()
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 450.dp),
+                .heightIn(max = 500.dp),
             shape = RoundedCornerShape(16.dp),
             color = CardBackground
         ) {
@@ -81,15 +141,24 @@ fun EmojiPickerDialog(
                     text = "Choose Emoji",
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                // Category tabs
+                // Category name
+                Text(
+                    text = emojiCategories[selectedCategory].name,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                // Scrollable category tabs
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .horizontalScroll(tabScrollState)
                         .padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     emojiCategories.forEachIndexed { index, category ->
                         Box(
@@ -110,10 +179,10 @@ fun EmojiPickerDialog(
 
                 // Emoji grid
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(5),
+                    columns = GridCells.Fixed(6),
                     modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     items(emojiCategories[selectedCategory].emojis) { emoji ->
                         Box(
@@ -130,7 +199,7 @@ fun EmojiPickerDialog(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = emoji, fontSize = 24.sp, textAlign = TextAlign.Center)
+                            Text(text = emoji, fontSize = 22.sp, textAlign = TextAlign.Center)
                         }
                     }
                 }

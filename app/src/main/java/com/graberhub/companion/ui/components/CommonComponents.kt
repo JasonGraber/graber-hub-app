@@ -88,8 +88,9 @@ fun ColorPickerDialog(
     }
 }
 
-// ── Clock Face Time Picker ─────────────────────────────
+// ── Material 3 Clock Time Picker ───────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClockTimePickerDialog(
     initialHour: Int,
@@ -97,9 +98,11 @@ fun ClockTimePickerDialog(
     onTimeSelected: (Int, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var hour by remember { mutableIntStateOf(initialHour) }
-    var minute by remember { mutableIntStateOf(initialMinute) }
-    var isPm by remember { mutableStateOf(initialHour >= 12) }
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = false
+    )
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -117,95 +120,25 @@ fun ClockTimePickerDialog(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // Time display
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    // Hour
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        TextButton(onClick = {
-                            val h12 = if (hour % 12 == 0) 12 else hour % 12
-                            val next = if (h12 >= 12) 1 else h12 + 1
-                            hour = if (isPm) (if (next == 12) 12 else next + 12) else (if (next == 12) 0 else next)
-                        }) { Text("▲", fontSize = 20.sp) }
-                        Text(
-                            text = String.format("%02d", if (hour % 12 == 0) 12 else hour % 12),
-                            style = MaterialTheme.typography.displayLarge,
-                            color = ShedBlue
-                        )
-                        TextButton(onClick = {
-                            val h12 = if (hour % 12 == 0) 12 else hour % 12
-                            val prev = if (h12 <= 1) 12 else h12 - 1
-                            hour = if (isPm) (if (prev == 12) 12 else prev + 12) else (if (prev == 12) 0 else prev)
-                        }) { Text("▼", fontSize = 20.sp) }
-                    }
-
-                    Text(
-                        ":",
-                        style = MaterialTheme.typography.displayLarge,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(horizontal = 8.dp)
+                TimePicker(
+                    state = timePickerState,
+                    colors = TimePickerDefaults.colors(
+                        clockDialColor = BackgroundGray,
+                        selectorColor = ShedBlue,
+                        containerColor = CardBackground,
+                        periodSelectorSelectedContainerColor = ShedBlue,
+                        periodSelectorSelectedContentColor = Color.White,
+                        periodSelectorUnselectedContainerColor = BackgroundGray,
+                        periodSelectorUnselectedContentColor = TextSecondary,
+                        timeSelectorSelectedContainerColor = ShedBlueLight,
+                        timeSelectorSelectedContentColor = ShedBlue,
+                        timeSelectorUnselectedContainerColor = BackgroundGray,
+                        timeSelectorUnselectedContentColor = TextPrimary
                     )
+                )
 
-                    // Minute
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        TextButton(onClick = { minute = (minute + 5) % 60 }) {
-                            Text("▲", fontSize = 20.sp)
-                        }
-                        Text(
-                            text = String.format("%02d", minute),
-                            style = MaterialTheme.typography.displayLarge,
-                            color = ShedBlue
-                        )
-                        TextButton(onClick = { minute = if (minute < 5) 55 else minute - 5 }) {
-                            Text("▼", fontSize = 20.sp)
-                        }
-                    }
+                Spacer(Modifier.height(16.dp))
 
-                    Spacer(Modifier.width(16.dp))
-
-                    // AM/PM
-                    Column {
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    isPm = false
-                                    hour = hour % 12
-                                },
-                            color = if (!isPm) ShedBlue else BackgroundGray
-                        ) {
-                            Text(
-                                "AM",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                color = if (!isPm) Color.White else TextSecondary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    isPm = true
-                                    hour = if (hour < 12) hour + 12 else hour
-                                },
-                            color = if (isPm) ShedBlue else BackgroundGray
-                        ) {
-                            Text(
-                                "PM",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                color = if (isPm) Color.White else TextSecondary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -213,7 +146,9 @@ fun ClockTimePickerDialog(
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(Modifier.width(8.dp))
                     Button(
-                        onClick = { onTimeSelected(hour, minute) },
+                        onClick = {
+                            onTimeSelected(timePickerState.hour, timePickerState.minute)
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
                     ) { Text("OK") }
                 }
