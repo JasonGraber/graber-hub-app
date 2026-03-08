@@ -465,7 +465,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Version", color = TextSecondary)
-                    Text("1.1.1", color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("1.1.2", color = TextPrimary, fontWeight = FontWeight.Medium)
                 }
             }
         }

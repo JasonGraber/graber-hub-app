@@ -122,12 +122,19 @@ data class UpdateKidColorRequest(
 )
 
 // Photo Settings
+data class AutoSchedule(
+    val photos_start: String? = "20:00",
+    val photos_end: String? = "07:00"
+)
+
 data class PhotoSettings(
     val mode: String? = "dashboard",
     val album_url: String? = null,
     val transition_seconds: Int? = 10,
+    val auto_schedule: AutoSchedule? = null,
     val show_clock: Boolean? = true,
     val show_weather: Boolean? = true,
+    val show_date: Boolean? = true,
     val ken_burns: Boolean? = true
 )
 

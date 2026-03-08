@@ -39,6 +39,7 @@ fun GraberHubApp() {
     val viewModel: MainViewModel = viewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val screens = listOf(
         Screen.Schedule,
@@ -48,9 +49,32 @@ fun GraberHubApp() {
         Screen.Settings
     )
 
+    // Show error as snackbar
+    val error by viewModel.error.collectAsState()
+    LaunchedEffect(error) {
+        error?.let { errorMessage ->
+            val result = snackbarHostState.showSnackbar(
+                message = errorMessage,
+                actionLabel = "Dismiss",
+                duration = SnackbarDuration.Short
+            )
+            viewModel.clearError()
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = BackgroundGray,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = TextPrimary,
+                    contentColor = BackgroundWhite,
+                    actionColor = ShedBlueLight
+                )
+            }
+        },
         bottomBar = {
             NavigationBar(
                 containerColor = CardBackground,
@@ -100,22 +124,6 @@ fun GraberHubApp() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             NavGraph(navController = navController, viewModel = viewModel)
-        }
-
-        // Error snackbar
-        val error by viewModel.error.collectAsState()
-        error?.let { errorMessage ->
-            Snackbar(
-                modifier = Modifier.padding(16.dp),
-                action = {
-                    TextButton(onClick = { viewModel.clearError() }) {
-                        Text("Dismiss", color = ShedBlueLight)
-                    }
-                },
-                containerColor = TextPrimary
-            ) {
-                Text(errorMessage, color = BackgroundWhite)
-            }
         }
     }
 }
