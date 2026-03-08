@@ -12,9 +12,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.graberhub.companion.ui.components.DisplayModeIndicator
 import com.graberhub.companion.ui.navigation.NavGraph
 import com.graberhub.companion.ui.navigation.Screen
 import com.graberhub.companion.ui.theme.*
@@ -122,8 +124,12 @@ fun GraberHubApp() {
             }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            NavGraph(navController = navController, viewModel = viewModel)
+        val displayMode by viewModel.displayMode.collectAsStateWithLifecycle()
+        Column(modifier = Modifier.padding(innerPadding)) {
+            DisplayModeIndicator(mode = displayMode)
+            Box(modifier = Modifier.weight(1f)) {
+                NavGraph(navController = navController, viewModel = viewModel)
+            }
         }
     }
 }

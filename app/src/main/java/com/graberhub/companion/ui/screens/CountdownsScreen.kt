@@ -58,6 +58,7 @@ fun CountdownsScreen(viewModel: MainViewModel) {
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     items(countdowns, key = { it.id }) { countdown ->

@@ -81,6 +81,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _photoSettingsSaved = MutableStateFlow<String?>(null)
     val photoSettingsSaved: StateFlow<String?> = _photoSettingsSaved.asStateFlow()
 
+    private val _displayMode = MutableStateFlow("dashboard")
+    val displayMode: StateFlow<String> = _displayMode.asStateFlow()
+
+    private var displayModePollJob: Job? = null
     private var timerTickJob: Job? = null
     private var alarmAutoStopJob: Job? = null
 
@@ -95,6 +99,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateActiveNetworkLabel()
         connectWithFallback()
         loadTimer()
+        startDisplayModePoll()
 
         val filter = IntentFilter(AlarmService.ACTION_STOP)
         if (Build.VERSION.SDK_INT >= 33) {
@@ -106,9 +111,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        displayModePollJob?.cancel()
         try {
             getApplication<Application>().unregisterReceiver(alarmStopReceiver)
         } catch (_: Exception) {}
+    }
+
+    private fun startDisplayModePoll() {
+        displayModePollJob?.cancel()
+        displayModePollJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    val response = RetrofitClient.getApiService().getPhotoSettings()
+                    if (response.isSuccessful) {
+                        response.body()?.let { settings ->
+                            _displayMode.value = settings.mode ?: "dashboard"
+                            _photoSettings.value = settings
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d("MainViewModel", "Display mode poll failed: ${e.message}")
+                }
+                delay(5000)
+            }
+        }
     }
 
     private fun initRetrofit() {

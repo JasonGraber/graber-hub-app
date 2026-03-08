@@ -133,6 +133,7 @@ fun ScheduleScreen(viewModel: MainViewModel) {
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     itemsIndexed(schedule, key = { _, block -> block.id }) { _, block ->
