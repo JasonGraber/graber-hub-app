@@ -152,6 +152,15 @@ data class UploadedPhoto(
     val modified: String? = null
 )
 
+// ── Schedule Templates (local + custom) ───────────────────
+
+data class ScheduleTemplate(
+    val name: String,
+    val emoji: String,
+    val blocks: List<CreateScheduleRequest>,
+    val isCustom: Boolean = false
+)
+
 // ── Chore Templates ────────────────────────────────────────
 
 data class ChoreTemplate(

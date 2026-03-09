@@ -28,18 +28,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.graberhub.companion.data.models.CreateScheduleRequest
 import com.graberhub.companion.data.models.ScheduleBlock
+import com.graberhub.companion.data.models.ScheduleTemplate
 import com.graberhub.companion.ui.components.*
 import com.graberhub.companion.ui.theme.*
 import com.graberhub.companion.viewmodel.MainViewModel
 
-// Schedule templates
-data class ScheduleTemplate(
-    val name: String,
-    val emoji: String,
-    val blocks: List<CreateScheduleRequest>
-)
-
-val scheduleTemplates = listOf(
+// Built-in schedule templates
+val builtInScheduleTemplates = listOf(
     ScheduleTemplate("School Day", "🏫", listOf(
         CreateScheduleRequest("06:30", "07:00", "Wake Up & Get Ready", "🌅"),
         CreateScheduleRequest("07:00", "07:30", "Breakfast", "🥣"),
@@ -87,9 +82,11 @@ val scheduleTemplates = listOf(
 fun ScheduleScreen(viewModel: MainViewModel) {
     val schedule by viewModel.schedule.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val customTemplates by viewModel.customScheduleTemplates.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
     var editingBlock by remember { mutableStateOf<ScheduleBlock?>(null) }
     var showTemplateDialog by remember { mutableStateOf(false) }
+    var showSaveTemplateDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -178,8 +175,6 @@ fun ScheduleScreen(viewModel: MainViewModel) {
 
     // Edit dialog
     editingBlock?.let { block ->
-        val (sh, sm) = parseTimeString(block.time_start)
-        val (eh, em) = parseTimeString(block.time_end)
         ScheduleBlockDialog(
             block = block,
             onSave = { title, emoji, startH, startM, endH, endM ->
@@ -194,11 +189,11 @@ fun ScheduleScreen(viewModel: MainViewModel) {
         )
     }
 
-    // Template dialog
+    // Template picker dialog
     if (showTemplateDialog) {
         TemplatePickerDialog(
+            customTemplates = customTemplates,
             onApply = { template ->
-                // Delete existing and apply template
                 schedule.forEach { viewModel.deleteScheduleBlock(it.id) }
                 template.blocks.forEach { block ->
                     viewModel.addScheduleBlock(block.time_start, block.time_end, block.title, block.emoji)
@@ -206,10 +201,25 @@ fun ScheduleScreen(viewModel: MainViewModel) {
                 showTemplateDialog = false
             },
             onSaveAsTemplate = {
-                viewModel.applyTemplate()
                 showTemplateDialog = false
+                showSaveTemplateDialog = true
+            },
+            onDeleteCustomTemplate = { template ->
+                viewModel.deleteCustomScheduleTemplate(template.name)
             },
             onDismiss = { showTemplateDialog = false }
+        )
+    }
+
+    // Save-as-template name dialog
+    if (showSaveTemplateDialog) {
+        SaveTemplateNameDialog(
+            blockCount = schedule.size,
+            onSave = { name, emoji ->
+                viewModel.saveCustomScheduleTemplate(name, emoji)
+                showSaveTemplateDialog = false
+            },
+            onDismiss = { showSaveTemplateDialog = false }
         )
     }
 }
@@ -427,9 +437,102 @@ private fun ScheduleBlockDialog(
 }
 
 @Composable
+private fun SaveTemplateNameDialog(
+    blockCount: Int,
+    onSave: (name: String, emoji: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var emoji by remember { mutableStateOf("") }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = CardBackground
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "💾 Save as Template",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TextPrimary
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    "Saves the current $blockCount block${if (blockCount != 1) "s" else ""} as a reusable template.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Template Name") },
+                    placeholder = { Text("e.g. No-School Day") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                // Emoji selector
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(BackgroundGray)
+                        .clickable { showEmojiPicker = true }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (emoji.isNotEmpty()) emoji else "📋  Choose Emoji (optional)",
+                        fontSize = if (emoji.isNotEmpty()) 24.sp else 14.sp,
+                        color = if (emoji.isNotEmpty()) TextPrimary else TextHint
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (name.isNotBlank()) {
+                                onSave(name.trim(), emoji.ifEmpty { "📋" })
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                        enabled = name.isNotBlank()
+                    ) { Text("Save Template") }
+                }
+            }
+        }
+    }
+
+    if (showEmojiPicker) {
+        EmojiPickerDialog(
+            selectedEmoji = emoji,
+            onEmojiSelected = { emoji = it },
+            onDismiss = { showEmojiPicker = false }
+        )
+    }
+}
+
+@Composable
 private fun TemplatePickerDialog(
+    customTemplates: List<ScheduleTemplate>,
     onApply: (ScheduleTemplate) -> Unit,
     onSaveAsTemplate: () -> Unit,
+    onDeleteCustomTemplate: (ScheduleTemplate) -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -446,34 +549,34 @@ private fun TemplatePickerDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                scheduleTemplates.forEach { template ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clickable { onApply(template) },
-                        shape = RoundedCornerShape(12.dp),
-                        color = BackgroundGray
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(template.emoji, fontSize = 28.sp)
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    template.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextPrimary
-                                )
-                                Text(
-                                    "${template.blocks.size} blocks",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
+                // Built-in templates
+                builtInScheduleTemplates.forEach { template ->
+                    TemplateRow(
+                        template = template,
+                        isCustom = false,
+                        onClick = { onApply(template) },
+                        onDelete = {}
+                    )
+                }
+
+                // Custom templates
+                if (customTemplates.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider(color = DividerColor)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "My Templates",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    customTemplates.forEach { template ->
+                        TemplateRow(
+                            template = template,
+                            isCustom = true,
+                            onClick = { onApply(template) },
+                            onDelete = { onDeleteCustomTemplate(template) }
+                        )
                     }
                 }
 
@@ -493,6 +596,56 @@ private fun TemplatePickerDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Cancel")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TemplateRow(
+    template: ScheduleTemplate,
+    isCustom: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        color = BackgroundGray
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(template.emoji, fontSize = 28.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    template.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+                Text(
+                    "${template.blocks.size} blocks",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            if (isCustom) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete template",
+                        tint = ShedPink,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }

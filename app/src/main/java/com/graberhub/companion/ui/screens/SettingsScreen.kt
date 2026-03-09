@@ -1,6 +1,8 @@
 package com.graberhub.companion.ui.screens
 
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -22,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +39,7 @@ import com.graberhub.companion.viewmodel.MainViewModel
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
+    val context = LocalContext.current
     val connectionStatus by viewModel.connectionStatus.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val activeNetwork by viewModel.activeNetwork.collectAsStateWithLifecycle()
@@ -45,15 +49,31 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val photoSettingsSaved by viewModel.photoSettingsSaved.collectAsStateWithLifecycle()
     val photos by viewModel.photos.collectAsStateWithLifecycle()
     val photoUploadInProgress by viewModel.photoUploadInProgress.collectAsStateWithLifecycle()
+    val photoSource by viewModel.photoSource.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
     var serverUrl by remember { mutableStateOf(viewModel.prefs.serverUrl) }
     var albumUrl by remember { mutableStateOf("") }
     var showVerseDialog by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf<Int?>(null) }
 
+    // Photo picker — PickVisualMedia is more reliable than GetContent for images
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        uri?.let { viewModel.uploadPhoto(it) }
+        if (uri != null) {
+            android.util.Log.d("Upload", "URI selected: $uri")
+            viewModel.uploadPhoto(uri)
+        } else {
+            android.util.Log.d("Upload", "No URI returned from picker")
+        }
+    }
+
+    // Show upload errors as Toast
+    LaunchedEffect(error) {
+        error?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -425,134 +445,184 @@ fun SettingsScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Photo Album section
+        // Unified Photo Settings section — toggle between Uploaded Photos and Google Photos
         item {
-            SettingsCard(title = "🖼️ Photo Album") {
-                OutlinedTextField(
-                    value = albumUrl,
-                    onValueChange = { albumUrl = it },
-                    label = { Text("Google Photos Album URL") },
-                    placeholder = { Text("Paste shared album link") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+            SettingsCard(title = "📸 Photo Settings") {
 
-                Spacer(Modifier.height(12.dp))
+                // Source selector
+                Text(
+                    "Photo Source",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AnimatedVisibility(
-                        visible = photoSettingsSaved == "album",
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        Text(
-                            "✓ Album URL saved",
-                            color = CheckGreen,
-                            style = MaterialTheme.typography.bodyMedium
+                    val isUploaded = photoSource == "uploaded"
+                    val isGoogle = photoSource == "google"
+
+                    // Uploaded Photos chip
+                    FilterChip(
+                        selected = isUploaded,
+                        onClick = { viewModel.setPhotoSource("uploaded") },
+                        label = { Text("📤 Uploaded Photos") },
+                        modifier = Modifier.weight(1f),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ShedBlue,
+                            selectedLabelColor = Color.White
                         )
-                    }
-
-                    Spacer(Modifier.weight(1f))
-
-                    Button(
-                        onClick = { viewModel.updateAlbumUrl(albumUrl) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
-                        enabled = albumUrl.isNotBlank()
-                    ) {
-                        Text("Save")
-                    }
-                }
-            }
-        }
-
-        // Photo Frame Upload
-        item {
-            SettingsCard(title = "📸 Photo Frame") {
-                Text(
-                    "Upload 1-2 photos. They display as a digital picture frame when photo mode is active.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                if (photos.isEmpty()) {
-                    Text(
-                        "No photos uploaded yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextHint,
-                        modifier = Modifier.padding(bottom = 8.dp)
                     )
-                } else {
-                    photos.forEach { photo ->
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = BackgroundGray
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+
+                    // Google Photos chip
+                    FilterChip(
+                        selected = isGoogle,
+                        onClick = { viewModel.setPhotoSource("google") },
+                        label = { Text("📷 Google Photos") },
+                        modifier = Modifier.weight(1f),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ShedBlue,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = DividerColor)
+                Spacer(Modifier.height(12.dp))
+
+                if (photoSource == "uploaded") {
+                    // ── Uploaded Photos UI ──────────────────────────────
+                    Text(
+                        "Upload 1-2 photos to display as a digital picture frame when photo mode is active.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    if (photos.isEmpty()) {
+                        Text(
+                            "No photos uploaded yet.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextHint,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    } else {
+                        photos.forEach { photo ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = BackgroundGray
                             ) {
-                                Text("🖼️", fontSize = 24.sp)
-                                Spacer(Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        photo.filename,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = TextPrimary,
-                                        maxLines = 1
-                                    )
-                                    if (photo.size > 0) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("🖼️", fontSize = 24.sp)
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            formatFileSize(photo.size),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = TextSecondary
+                                            photo.filename,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = TextPrimary,
+                                            maxLines = 1
+                                        )
+                                        if (photo.size > 0) {
+                                            Text(
+                                                formatFileSize(photo.size),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = TextSecondary
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.deleteUploadedPhoto(photo.filename) }
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Delete photo",
+                                            tint = ShedPink,
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
-                                }
-                                IconButton(
-                                    onClick = { viewModel.deleteUploadedPhoto(photo.filename) }
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Delete photo",
-                                        tint = ShedPink,
-                                        modifier = Modifier.size(20.dp)
-                                    )
                                 }
                             }
                         }
                     }
-                }
 
-                Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(8.dp))
 
-                Button(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    enabled = photos.size < 2 && !photoUploadInProgress,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
-                ) {
-                    if (photoUploadInProgress) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Uploading...")
-                    } else {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (photos.size >= 2) "Max 2 photos reached" else "Upload Photo"
-                        )
+                    Button(
+                        onClick = {
+                            android.util.Log.d("Upload", "Launching PickVisualMedia")
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = photos.size < 2 && !photoUploadInProgress,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
+                    ) {
+                        if (photoUploadInProgress) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Uploading...")
+                        } else {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (photos.size >= 2) "Max 2 photos reached" else "Upload Photo"
+                            )
+                        }
+                    }
+
+                } else {
+                    // ── Google Photos Album UI ──────────────────────────
+                    OutlinedTextField(
+                        value = albumUrl,
+                        onValueChange = { albumUrl = it },
+                        label = { Text("Google Photos Album URL") },
+                        placeholder = { Text("Paste shared album link") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AnimatedVisibility(
+                            visible = photoSettingsSaved == "album",
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            Text(
+                                "✓ Album URL saved",
+                                color = CheckGreen,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
+                        Spacer(Modifier.weight(1f))
+
+                        Button(
+                            onClick = { viewModel.updateAlbumUrl(albumUrl) },
+                            colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                            enabled = albumUrl.isNotBlank()
+                        ) {
+                            Text("Save")
+                        }
                     }
                 }
             }
@@ -566,7 +636,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Version", color = TextSecondary)
-                    Text("1.4.0", color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("1.4.1", color = TextPrimary, fontWeight = FontWeight.Medium)
                 }
             }
         }

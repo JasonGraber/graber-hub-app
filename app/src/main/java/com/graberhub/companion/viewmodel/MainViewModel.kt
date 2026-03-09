@@ -94,6 +94,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _photoUploadInProgress = MutableStateFlow(false)
     val photoUploadInProgress: StateFlow<Boolean> = _photoUploadInProgress.asStateFlow()
 
+    private val _customScheduleTemplates = MutableStateFlow<List<com.graberhub.companion.data.models.ScheduleTemplate>>(prefs.customScheduleTemplates)
+    val customScheduleTemplates: StateFlow<List<com.graberhub.companion.data.models.ScheduleTemplate>> = _customScheduleTemplates.asStateFlow()
+
+    private val _photoSource = MutableStateFlow(prefs.photoSource)
+    val photoSource: StateFlow<String> = _photoSource.asStateFlow()
+
     private var displayModePollJob: Job? = null
     private var timerTickJob: Job? = null
     private var alarmAutoStopJob: Job? = null
@@ -342,6 +348,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _error.value = "Failed to save template"
             }
         }
+    }
+
+    fun saveCustomScheduleTemplate(name: String, emoji: String) {
+        val blocks = _schedule.value.map {
+            CreateScheduleRequest(it.time_start, it.time_end, it.title, it.emoji)
+        }
+        val template = com.graberhub.companion.data.models.ScheduleTemplate(
+            name = name.trim(),
+            emoji = emoji.trim().ifEmpty { "📋" },
+            blocks = blocks,
+            isCustom = true
+        )
+        val updated = _customScheduleTemplates.value + template
+        prefs.customScheduleTemplates = updated
+        _customScheduleTemplates.value = updated
+        Log.d("MainViewModel", "Saved custom template: ${template.name} (${blocks.size} blocks)")
+    }
+
+    fun deleteCustomScheduleTemplate(name: String) {
+        val updated = _customScheduleTemplates.value.filter { it.name != name }
+        prefs.customScheduleTemplates = updated
+        _customScheduleTemplates.value = updated
+    }
+
+    fun setPhotoSource(source: String) {
+        prefs.photoSource = source
+        _photoSource.value = source
     }
 
     // ── Countdowns ─────────────────────────────────────────

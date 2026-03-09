@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.graberhub.companion.data.models.KidConfig
+import com.graberhub.companion.data.models.ScheduleTemplate
 
 class PrefsManager(context: Context) {
 
@@ -13,6 +14,8 @@ class PrefsManager(context: Context) {
     companion object {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_KIDS = "kids_config"
+        private const val KEY_CUSTOM_SCHEDULE_TEMPLATES = "custom_schedule_templates"
+        private const val KEY_PHOTO_SOURCE = "photo_source"
 
         const val HOME_URL = "http://192.168.86.43/"
         const val TAILSCALE_URL = "http://100.72.250.82/"
@@ -64,4 +67,23 @@ class PrefsManager(context: Context) {
     fun resetKids() {
         prefs.edit().remove(KEY_KIDS).apply()
     }
+
+    var customScheduleTemplates: List<ScheduleTemplate>
+        get() {
+            val json = prefs.getString(KEY_CUSTOM_SCHEDULE_TEMPLATES, null) ?: return emptyList()
+            return try {
+                val type = object : TypeToken<List<ScheduleTemplate>>() {}.type
+                gson.fromJson<List<ScheduleTemplate>>(json, type) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_CUSTOM_SCHEDULE_TEMPLATES, gson.toJson(value)).apply()
+        }
+
+    // "uploaded" or "google"
+    var photoSource: String
+        get() = prefs.getString(KEY_PHOTO_SOURCE, "uploaded") ?: "uploaded"
+        set(value) { prefs.edit().putString(KEY_PHOTO_SOURCE, value).apply() }
 }
