@@ -2,9 +2,11 @@ package com.graberhub.companion.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -311,6 +313,7 @@ private fun repeatSummary(template: ChoreTemplate): String {
 
 // ── Template Dialog ────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TemplateDialog(
     template: ChoreTemplate?,
@@ -329,6 +332,17 @@ private fun TemplateDialog(
     var startDate by remember { mutableStateOf(template?.start_date ?: today) }
     var active by remember { mutableStateOf(template?.active ?: true) }
     var showEmojiPicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = remember(startDate) {
+            try {
+                SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }.parse(startDate)?.time
+            } catch (_: Exception) { null }
+        }
+    )
 
     val repeatOptions = listOf("daily", "weekly", "monthly", "none")
     val dayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
@@ -357,7 +371,10 @@ private fun TemplateDialog(
                     item {
                         Text("For kid:", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                         Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             kids.forEach { kid ->
                                 val selected = kid.id == selectedKidId
                                 val kidColor = try {
@@ -415,7 +432,13 @@ private fun TemplateDialog(
                             FilterChip(
                                 selected = repeat == opt,
                                 onClick = { repeat = opt },
-                                label = { Text(opt.replaceFirstChar { it.uppercase() }) }
+                                modifier = Modifier.widthIn(min = 72.dp),
+                                label = {
+                                    Text(
+                                        opt.replaceFirstChar { it.uppercase() },
+                                        maxLines = 1
+                                    )
+                                }
                             )
                         }
                     }
@@ -497,13 +520,22 @@ private fun TemplateDialog(
 
                 // Start date
                 item {
-                    OutlinedTextField(
-                        value = startDate,
-                        onValueChange = { startDate = it },
-                        label = { Text("Start Date (YYYY-MM-DD)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = startDate,
+                            onValueChange = {},
+                            label = { Text("Start Date") },
+                            modifier = Modifier.fillMaxWidth(),
+                            readOnly = true,
+                            singleLine = true
+                        )
+                        // Transparent overlay captures the tap
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showDatePicker = true }
+                        )
+                    }
                 }
 
                 // Active toggle
@@ -550,6 +582,27 @@ private fun TemplateDialog(
                     }
                 }
             }
+        }
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        startDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                            timeZone = TimeZone.getTimeZone("UTC")
+                        }.format(Date(millis))
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 
