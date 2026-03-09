@@ -55,6 +55,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _verses = MutableStateFlow<List<Verse>>(emptyList())
     val verses: StateFlow<List<Verse>> = _verses.asStateFlow()
 
+    private val _activeVerseId = MutableStateFlow<Int?>(null)
+    val activeVerseId: StateFlow<Int?> = _activeVerseId.asStateFlow()
+
     private val _connectionStatus = MutableStateFlow<String?>(null)
     val connectionStatus: StateFlow<String?> = _connectionStatus.asStateFlow()
 
@@ -375,6 +378,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setPhotoSource(source: String) {
         prefs.photoSource = source
         _photoSource.value = source
+        // Also persist to server so the Pi dashboard knows which source to use
+        viewModelScope.launch {
+            try {
+                RetrofitClient.getApiService().updatePhotoSettings(
+                    PhotoSettingsRequest(photo_source = source)
+                )
+            } catch (_: Exception) {}
+        }
     }
 
     // ── Countdowns ─────────────────────────────────────────
@@ -431,6 +442,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadActiveVerse() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().getActiveVerse()
+                if (response.isSuccessful) {
+                    _activeVerseId.value = response.body()?.get("active_verse_id")
+                }
+            } catch (_: Exception) {
+                Log.w("MainViewModel", "Failed to load active verse")
+            }
+        }
+    }
+
+    fun setActiveVerse(id: Int) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().setActiveVerse(id)
+                if (response.isSuccessful) {
+                    _activeVerseId.value = id
+                }
+            } catch (_: Exception) {
+                _error.value = "Failed to set active verse"
+            }
+        }
+    }
+
+    fun clearActiveVerse() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().clearActiveVerse()
+                if (response.isSuccessful) {
+                    _activeVerseId.value = null
+                }
+            } catch (_: Exception) {
+                _error.value = "Failed to clear active verse"
+            }
+        }
+    }
+
     fun addVerse(text: String, reference: String) {
         viewModelScope.launch {
             try {
@@ -438,6 +488,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 loadVerses()
             } catch (_: Exception) {
                 _error.value = "Failed to add verse"
+            }
+        }
+    }
+
+    fun editVerse(id: Int, text: String, reference: String) {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.getApiService().updateVerse(id, UpdateVerseRequest(text, reference))
+                loadVerses()
+            } catch (_: Exception) {
+                _error.value = "Failed to edit verse"
+            }
+        }
+    }
+
+    fun deleteVerse(id: Int) {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.getApiService().deleteVerse(id)
+                _verses.value = _verses.value.filter { it.id != id }
+                if (_activeVerseId.value == id) _activeVerseId.value = null
+            } catch (_: Exception) {
+                _error.value = "Failed to delete verse"
             }
         }
     }

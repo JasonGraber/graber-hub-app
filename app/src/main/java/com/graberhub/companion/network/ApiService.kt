@@ -53,6 +53,21 @@ interface ApiService {
     @POST("api.php/verses")
     suspend fun createVerse(@Body request: CreateVerseRequest): Response<ApiResponse>
 
+    @PUT("api.php/verses/{id}")
+    suspend fun updateVerse(@Path("id") id: Int, @Body request: UpdateVerseRequest): Response<ApiResponse>
+
+    @DELETE("api.php/verses/{id}")
+    suspend fun deleteVerse(@Path("id") id: Int): Response<ApiResponse>
+
+    @GET("api.php/verses/active")
+    suspend fun getActiveVerse(): Response<Map<String, Int?>>
+
+    @PUT("api.php/verses/active/{id}")
+    suspend fun setActiveVerse(@Path("id") id: Int): Response<ApiResponse>
+
+    @DELETE("api.php/verses/active")
+    suspend fun clearActiveVerse(): Response<ApiResponse>
+
     // Timer
     @GET("api.php/timer")
     suspend fun getTimer(): Response<TimerStatus>

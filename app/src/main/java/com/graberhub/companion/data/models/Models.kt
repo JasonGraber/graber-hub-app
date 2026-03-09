@@ -46,7 +46,7 @@ data class Countdown(
 data class Verse(
     val id: Int,
     val text: String,
-    val reference: String
+    @SerializedName("ref") val reference: String
 )
 
 data class TimerStatus(
@@ -117,6 +117,11 @@ data class CreateVerseRequest(
     val reference: String
 )
 
+data class UpdateVerseRequest(
+    val text: String,
+    val reference: String
+)
+
 data class UpdateKidColorRequest(
     val color: String
 )
@@ -140,7 +145,8 @@ data class PhotoSettings(
 
 data class PhotoSettingsRequest(
     val mode: String? = null,
-    val album_url: String? = null
+    val album_url: String? = null,
+    val photo_source: String? = null
 )
 
 // ── Photo Upload ───────────────────────────────────────────

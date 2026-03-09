@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,6 +46,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val activeNetwork by viewModel.activeNetwork.collectAsStateWithLifecycle()
     val kidsConfig by viewModel.kidsConfig.collectAsStateWithLifecycle()
     val verses by viewModel.verses.collectAsStateWithLifecycle()
+    val activeVerseId by viewModel.activeVerseId.collectAsStateWithLifecycle()
     val photoSettings by viewModel.photoSettings.collectAsStateWithLifecycle()
     val photoSettingsSaved by viewModel.photoSettingsSaved.collectAsStateWithLifecycle()
     val photos by viewModel.photos.collectAsStateWithLifecycle()
@@ -54,6 +56,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
     var serverUrl by remember { mutableStateOf(viewModel.prefs.serverUrl) }
     var albumUrl by remember { mutableStateOf("") }
     var showVerseDialog by remember { mutableStateOf(false) }
+    var editingVerse by remember { mutableStateOf<com.graberhub.companion.data.models.Verse?>(null) }
     var showColorPicker by remember { mutableStateOf<Int?>(null) }
 
     // Photo picker — PickVisualMedia is more reliable than GetContent for images
@@ -78,6 +81,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
 
     LaunchedEffect(Unit) {
         viewModel.loadVerses()
+        viewModel.loadActiveVerse()
         viewModel.loadPhotoSettings()
         viewModel.loadPhotos()
     }
@@ -322,6 +326,49 @@ fun SettingsScreen(viewModel: MainViewModel) {
         // Verses section
         item {
             SettingsCard(title = "📖 Bible Verses") {
+                // Auto-rotate option
+                val isAutoRotate = activeVerseId == null
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { viewModel.clearActiveVerse() }
+                        .then(
+                            if (isAutoRotate) Modifier.border(2.dp, ShedBlue, RoundedCornerShape(8.dp))
+                            else Modifier
+                        ),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isAutoRotate) ShedBlueLight.copy(alpha = 0.2f) else BackgroundGray
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = isAutoRotate,
+                            onClick = { viewModel.clearActiveVerse() },
+                            colors = RadioButtonDefaults.colors(selectedColor = ShedBlue)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Auto-rotate (daily)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isAutoRotate) ShedBlueDark else TextPrimary,
+                                fontWeight = if (isAutoRotate) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                            Text(
+                                "Show a different verse each day",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
+
                 if (verses.isEmpty()) {
                     Text(
                         "No verses yet. Add one to display on the dashboard.",
@@ -331,22 +378,35 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     )
                 } else {
                     verses.forEach { verse ->
+                        val isActive = activeVerseId == verse.id
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.setActiveVerse(verse.id) }
+                                .then(
+                                    if (isActive) Modifier.border(2.dp, ShedBlue, RoundedCornerShape(8.dp))
+                                    else Modifier
+                                ),
                             shape = RoundedCornerShape(8.dp),
-                            color = BackgroundGray
+                            color = if (isActive) ShedBlueLight.copy(alpha = 0.2f) else BackgroundGray
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.Top
+                                modifier = Modifier.padding(start = 4.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                RadioButton(
+                                    selected = isActive,
+                                    onClick = { viewModel.setActiveVerse(verse.id) },
+                                    colors = RadioButtonDefaults.colors(selectedColor = ShedBlue)
+                                )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         "\"${verse.text}\"",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = TextPrimary
+                                        color = if (isActive) ShedBlueDark else TextPrimary,
+                                        fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
@@ -354,6 +414,28 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                         style = MaterialTheme.typography.labelMedium,
                                         color = ShedBlue,
                                         fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { editingVerse = verse },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Edit verse",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.deleteVerse(verse.id) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete verse",
+                                        tint = ShedPink,
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -636,7 +718,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Version", color = TextSecondary)
-                    Text("1.4.1", color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("1.4.2", color = TextPrimary, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -665,6 +747,18 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 showVerseDialog = false
             },
             onDismiss = { showVerseDialog = false }
+        )
+    }
+
+    // Edit verse dialog
+    editingVerse?.let { verse ->
+        EditVerseDialog(
+            verse = verse,
+            onSave = { text, reference ->
+                viewModel.editVerse(verse.id, text, reference)
+                editingVerse = null
+            },
+            onDismiss = { editingVerse = null }
         )
     }
 }
@@ -718,6 +812,71 @@ private fun AddVerseDialog(
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
                     "Add Bible Verse",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TextPrimary
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Verse Text") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = reference,
+                    onValueChange = { reference = it },
+                    label = { Text("Reference (e.g. John 3:16)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (text.isNotBlank() && reference.isNotBlank()) {
+                                onSave(text, reference)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ShedBlue),
+                        enabled = text.isNotBlank() && reference.isNotBlank()
+                    ) { Text("Save") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditVerseDialog(
+    verse: Verse,
+    onSave: (text: String, reference: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(verse.text) }
+    var reference by remember { mutableStateOf(verse.reference) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = CardBackground
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Edit Bible Verse",
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary
                 )
