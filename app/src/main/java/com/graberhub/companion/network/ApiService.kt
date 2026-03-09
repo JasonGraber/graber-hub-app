@@ -1,6 +1,7 @@
 package com.graberhub.companion.network
 
 import com.graberhub.companion.data.models.*
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -72,6 +73,17 @@ interface ApiService {
 
     @POST("api.php/photo-settings")
     suspend fun updatePhotoSettings(@Body request: PhotoSettingsRequest): Response<PhotoSettings>
+
+    // Photo Upload (picture frame)
+    @GET("api.php/photos")
+    suspend fun getPhotos(): Response<List<UploadedPhoto>>
+
+    @Multipart
+    @POST("api.php/photos")
+    suspend fun uploadPhoto(@Part photo: MultipartBody.Part): Response<ApiResponse>
+
+    @DELETE("api.php/photos/{filename}")
+    suspend fun deleteUploadedPhoto(@Path("filename") filename: String): Response<ApiResponse>
 
     // Chore Templates
     @GET("api.php/chore-templates")

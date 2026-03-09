@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -19,6 +20,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -83,6 +87,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _displayMode = MutableStateFlow("dashboard")
     val displayMode: StateFlow<String> = _displayMode.asStateFlow()
+
+    private val _photos = MutableStateFlow<List<UploadedPhoto>>(emptyList())
+    val photos: StateFlow<List<UploadedPhoto>> = _photos.asStateFlow()
+
+    private val _photoUploadInProgress = MutableStateFlow(false)
+    val photoUploadInProgress: StateFlow<Boolean> = _photoUploadInProgress.asStateFlow()
 
     private var displayModePollJob: Job? = null
     private var timerTickJob: Job? = null
@@ -632,6 +642,70 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() {
         _error.value = null
+    }
+
+    // ── Photo Upload (picture frame) ───────────────────────
+
+    fun loadPhotos() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().getPhotos()
+                if (response.isSuccessful) {
+                    _photos.value = response.body() ?: emptyList()
+                }
+            } catch (e: Exception) {
+                Log.w("MainViewModel", "Failed to load photos: ${e.message}")
+            }
+        }
+    }
+
+    fun uploadPhoto(uri: Uri) {
+        viewModelScope.launch {
+            _photoUploadInProgress.value = true
+            try {
+                val context = getApplication<Application>()
+                val contentResolver = context.contentResolver
+                val mimeType = contentResolver.getType(uri) ?: "image/jpeg"
+                val extension = when (mimeType) {
+                    "image/png" -> "png"
+                    "image/webp" -> "webp"
+                    else -> "jpg"
+                }
+                val inputStream = contentResolver.openInputStream(uri)
+                    ?: throw IllegalStateException("Cannot open input stream for URI")
+                val bytes = inputStream.readBytes()
+                inputStream.close()
+
+                val requestBody = bytes.toRequestBody(mimeType.toMediaType())
+                val part = MultipartBody.Part.createFormData("photo", "upload.$extension", requestBody)
+
+                val response = RetrofitClient.getApiService().uploadPhoto(part)
+                if (response.isSuccessful) {
+                    loadPhotos()
+                } else {
+                    _error.value = "Upload failed: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _error.value = "Upload failed: ${e.message}"
+            } finally {
+                _photoUploadInProgress.value = false
+            }
+        }
+    }
+
+    fun deleteUploadedPhoto(filename: String) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().deleteUploadedPhoto(filename)
+                if (response.isSuccessful) {
+                    _photos.value = _photos.value.filter { it.filename != filename }
+                } else {
+                    _error.value = "Delete failed: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _error.value = "Delete failed: ${e.message}"
+            }
+        }
     }
 
     // ── Chore Templates ────────────────────────────────────

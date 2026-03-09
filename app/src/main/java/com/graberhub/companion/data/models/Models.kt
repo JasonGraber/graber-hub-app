@@ -143,6 +143,15 @@ data class PhotoSettingsRequest(
     val album_url: String? = null
 )
 
+// ── Photo Upload ───────────────────────────────────────────
+
+data class UploadedPhoto(
+    val filename: String,
+    val url: String,
+    val size: Long = 0L,
+    val modified: String? = null
+)
+
 // ── Chore Templates ────────────────────────────────────────
 
 data class ChoreTemplate(

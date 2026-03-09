@@ -1,5 +1,7 @@
 package com.graberhub.companion.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,14 +43,23 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val verses by viewModel.verses.collectAsStateWithLifecycle()
     val photoSettings by viewModel.photoSettings.collectAsStateWithLifecycle()
     val photoSettingsSaved by viewModel.photoSettingsSaved.collectAsStateWithLifecycle()
+    val photos by viewModel.photos.collectAsStateWithLifecycle()
+    val photoUploadInProgress by viewModel.photoUploadInProgress.collectAsStateWithLifecycle()
     var serverUrl by remember { mutableStateOf(viewModel.prefs.serverUrl) }
     var albumUrl by remember { mutableStateOf("") }
     var showVerseDialog by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf<Int?>(null) }
 
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.uploadPhoto(it) }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.loadVerses()
         viewModel.loadPhotoSettings()
+        viewModel.loadPhotos()
     }
 
     // Sync album URL from API when photo settings load
@@ -457,6 +469,95 @@ fun SettingsScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Photo Frame Upload
+        item {
+            SettingsCard(title = "📸 Photo Frame") {
+                Text(
+                    "Upload 1-2 photos. They display as a digital picture frame when photo mode is active.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                if (photos.isEmpty()) {
+                    Text(
+                        "No photos uploaded yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextHint,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                } else {
+                    photos.forEach { photo ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = BackgroundGray
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🖼️", fontSize = 24.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        photo.filename,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextPrimary,
+                                        maxLines = 1
+                                    )
+                                    if (photo.size > 0) {
+                                        Text(
+                                            formatFileSize(photo.size),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { viewModel.deleteUploadedPhoto(photo.filename) }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete photo",
+                                        tint = ShedPink,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Button(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    enabled = photos.size < 2 && !photoUploadInProgress,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
+                ) {
+                    if (photoUploadInProgress) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Uploading...")
+                    } else {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (photos.size >= 2) "Max 2 photos reached" else "Upload Photo"
+                        )
+                    }
+                }
+            }
+        }
+
         // Version
         item {
             SettingsCard(title = "ℹ️ About") {
@@ -465,7 +566,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Version", color = TextSecondary)
-                    Text("1.1.2", color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("1.4.0", color = TextPrimary, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -520,6 +621,14 @@ private fun SettingsCard(
             )
             content()
         }
+    }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    return when {
+        bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
+        bytes >= 1_024 -> "%.1f KB".format(bytes / 1_024.0)
+        else -> "$bytes B"
     }
 }
 
