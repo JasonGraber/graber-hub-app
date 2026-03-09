@@ -72,4 +72,17 @@ interface ApiService {
 
     @POST("api.php/photo-settings")
     suspend fun updatePhotoSettings(@Body request: PhotoSettingsRequest): Response<PhotoSettings>
+
+    // Chore Templates
+    @GET("api.php/chore-templates")
+    suspend fun getChoreTemplates(): Response<List<ChoreTemplate>>
+
+    @POST("api.php/chore-templates")
+    suspend fun createChoreTemplate(@Body request: CreateChoreTemplateRequest): Response<ApiResponse>
+
+    @PUT("api.php/chore-templates/{id}")
+    suspend fun updateChoreTemplate(@Path("id") id: Int, @Body request: UpdateChoreTemplateRequest): Response<ApiResponse>
+
+    @DELETE("api.php/chore-templates/{id}")
+    suspend fun deleteChoreTemplate(@Path("id") id: Int): Response<ApiResponse>
 }

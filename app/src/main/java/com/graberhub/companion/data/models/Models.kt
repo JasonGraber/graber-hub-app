@@ -142,3 +142,42 @@ data class PhotoSettingsRequest(
     val mode: String? = null,
     val album_url: String? = null
 )
+
+// ── Chore Templates ────────────────────────────────────────
+
+data class ChoreTemplate(
+    val id: Int,
+    val kid_id: Int,
+    val title: String,
+    val emoji: String = "",
+    val repeat: String = "none",          // "daily" | "weekly" | "monthly" | "none"
+    val days_of_week: List<Int> = emptyList(),  // 0=Sun, 6=Sat
+    val every_other_week: Boolean = false,
+    val days_of_month: List<Int> = emptyList(), // 1-31
+    val start_date: String? = null,
+    val active: Boolean = true,
+    val week_parity: Int? = null
+)
+
+data class CreateChoreTemplateRequest(
+    val kid_id: Int,
+    val title: String,
+    val emoji: String = "",
+    val repeat: String = "none",
+    val days_of_week: List<Int> = emptyList(),
+    val every_other_week: Boolean = false,
+    val days_of_month: List<Int> = emptyList(),
+    val start_date: String? = null,
+    val active: Boolean = true
+)
+
+data class UpdateChoreTemplateRequest(
+    val title: String,
+    val emoji: String = "",
+    val repeat: String = "none",
+    val days_of_week: List<Int> = emptyList(),
+    val every_other_week: Boolean = false,
+    val days_of_month: List<Int> = emptyList(),
+    val start_date: String? = null,
+    val active: Boolean = true
+)

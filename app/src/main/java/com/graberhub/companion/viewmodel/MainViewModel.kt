@@ -633,4 +633,69 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearError() {
         _error.value = null
     }
+
+    // ── Chore Templates ────────────────────────────────────
+
+    private val _choreTemplates = MutableStateFlow<List<ChoreTemplate>>(emptyList())
+    val choreTemplates: StateFlow<List<ChoreTemplate>> = _choreTemplates.asStateFlow()
+
+    fun loadChoreTemplates() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().getChoreTemplates()
+                if (response.isSuccessful) {
+                    _choreTemplates.value = response.body() ?: emptyList()
+                } else {
+                    _error.value = "Failed to load chore templates: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to load chore templates: ${e.message}"
+            }
+        }
+    }
+
+    fun createChoreTemplate(request: CreateChoreTemplateRequest) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().createChoreTemplate(request)
+                if (response.isSuccessful) {
+                    loadChoreTemplates()
+                } else {
+                    _error.value = "Failed to create template"
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to create template: ${e.message}"
+            }
+        }
+    }
+
+    fun updateChoreTemplate(id: Int, request: UpdateChoreTemplateRequest) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().updateChoreTemplate(id, request)
+                if (response.isSuccessful) {
+                    loadChoreTemplates()
+                } else {
+                    _error.value = "Failed to update template"
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to update template: ${e.message}"
+            }
+        }
+    }
+
+    fun deleteChoreTemplate(id: Int) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().deleteChoreTemplate(id)
+                if (response.isSuccessful) {
+                    _choreTemplates.value = _choreTemplates.value.filter { it.id != id }
+                } else {
+                    _error.value = "Failed to delete template"
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to delete template: ${e.message}"
+            }
+        }
+    }
 }

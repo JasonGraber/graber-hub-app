@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,15 +27,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.graberhub.companion.data.models.Chore
 import com.graberhub.companion.data.models.Kid
 import com.graberhub.companion.data.models.KidConfig
 import com.graberhub.companion.ui.components.EmojiPickerDialog
+import com.graberhub.companion.ui.navigation.Screen
 import com.graberhub.companion.ui.theme.*
 import com.graberhub.companion.viewmodel.MainViewModel
 
 @Composable
-fun ChoresScreen(viewModel: MainViewModel) {
+fun ChoresScreen(viewModel: MainViewModel, navController: NavController? = null) {
     val kids by viewModel.kids.collectAsStateWithLifecycle()
     val kidsConfig by viewModel.kidsConfig.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -52,12 +55,27 @@ fun ChoresScreen(viewModel: MainViewModel) {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    Text(
-                        "✅ Chores",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "✅ Chores",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (navController != null) {
+                            IconButton(onClick = { navController.navigate(Screen.ManageChores.route) }) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = "Manage Templates",
+                                    tint = TextSecondary
+                                )
+                            }
+                        }
+                    }
                 }
 
                 items(kids, key = { it.id }) { kid ->
