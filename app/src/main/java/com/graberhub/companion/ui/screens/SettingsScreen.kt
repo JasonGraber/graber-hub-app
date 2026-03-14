@@ -626,8 +626,13 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                             maxLines = 1
                                         )
                                         Text(
-                                            if (photo.name.isNotBlank()) photo.filename else "" +
-                                                if (photo.size > 0) formatFileSize(photo.size) else "",
+                                            buildString {
+                                                if (photo.name.isNotBlank()) append(photo.filename)
+                                                if (photo.size > 0) {
+                                                    if (isNotEmpty()) append(" · ")
+                                                    append(formatFileSize(photo.size))
+                                                }
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = TextSecondary,
                                             maxLines = 1

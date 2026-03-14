@@ -920,27 +920,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val requestBody = bytes.toRequestBody(mimeType.toMediaType())
                 val part = MultipartBody.Part.createFormData("photo", "upload.$extension", requestBody)
 
-                // Build multipart body with optional name field
-                val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
-                builder.addPart(part)
-                if (name.isNotBlank()) {
-                    builder.addFormDataPart("name", name)
-                }
+                val namePart = if (name.isNotBlank()) {
+                    name.toRequestBody("text/plain".toMediaType())
+                } else null
 
-                val response = RetrofitClient.getApiService().uploadPhoto(part)
+                val response = RetrofitClient.getApiService().uploadPhoto(part, namePart)
                 if (response.isSuccessful) {
-                    // If we have a name but couldn't send it via multipart, rename after upload
-                    if (name.isNotBlank()) {
-                        try {
-                            // Reload photos to get the new filename, then rename
-                            loadPhotos()
-                            // Find the newest photo and rename it
-                            val latestPhoto = _photos.value.maxByOrNull { it.modified ?: "" }
-                            if (latestPhoto != null) {
-                                renamePhoto(latestPhoto.filename, name)
-                            }
-                        } catch (_: Exception) {}
-                    }
                     loadPhotos()
                 } else {
                     _error.value = "Upload failed: ${response.code()}"

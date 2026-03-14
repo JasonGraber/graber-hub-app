@@ -95,7 +95,10 @@ interface ApiService {
 
     @Multipart
     @POST("api.php/photos")
-    suspend fun uploadPhoto(@Part photo: MultipartBody.Part): Response<ApiResponse>
+    suspend fun uploadPhoto(
+        @Part photo: MultipartBody.Part,
+        @Part("name") name: okhttp3.RequestBody? = null
+    ): Response<ApiResponse>
 
     @PUT("api.php/photos/{filename}")
     suspend fun renameUploadedPhoto(@Path("filename") filename: String, @Body body: Map<String, String>): Response<ApiResponse>
