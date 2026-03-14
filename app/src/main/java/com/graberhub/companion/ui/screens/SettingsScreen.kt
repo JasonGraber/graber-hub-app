@@ -59,13 +59,21 @@ fun SettingsScreen(viewModel: MainViewModel) {
     var editingVerse by remember { mutableStateOf<com.graberhub.companion.data.models.Verse?>(null) }
     var showColorPicker by remember { mutableStateOf<Int?>(null) }
 
+    var pendingPhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var photoNameInput by remember { mutableStateOf("") }
+    var showPhotoNameDialog by remember { mutableStateOf(false) }
+    var renamingPhoto by remember { mutableStateOf<com.graberhub.companion.data.models.UploadedPhoto?>(null) }
+    var renameInput by remember { mutableStateOf("") }
+
     // Photo picker — PickVisualMedia is more reliable than GetContent for images
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
             android.util.Log.d("Upload", "URI selected: $uri")
-            viewModel.uploadPhoto(uri)
+            pendingPhotoUri = uri
+            photoNameInput = ""
+            showPhotoNameDialog = true
         } else {
             android.util.Log.d("Upload", "No URI returned from picker")
         }
@@ -596,7 +604,11 @@ fun SettingsScreen(viewModel: MainViewModel) {
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = 4.dp)
+                                    .clickable {
+                                        renamingPhoto = photo
+                                        renameInput = photo.name
+                                    },
                                 shape = RoundedCornerShape(8.dp),
                                 color = BackgroundGray
                             ) {
@@ -608,18 +620,18 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                     Spacer(Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            photo.filename,
+                                            photo.name.ifBlank { photo.filename },
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = TextPrimary,
                                             maxLines = 1
                                         )
-                                        if (photo.size > 0) {
-                                            Text(
-                                                formatFileSize(photo.size),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = TextSecondary
-                                            )
-                                        }
+                                        Text(
+                                            if (photo.name.isNotBlank()) photo.filename else "" +
+                                                if (photo.size > 0) formatFileSize(photo.size) else "",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TextSecondary,
+                                            maxLines = 1
+                                        )
                                     }
                                     IconButton(
                                         onClick = { viewModel.deleteUploadedPhoto(photo.filename) }
@@ -645,7 +657,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
                         },
-                        enabled = photos.size < 2 && !photoUploadInProgress,
+                        enabled = !photoUploadInProgress,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
                     ) {
@@ -660,9 +672,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         } else {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(
-                                if (photos.size >= 2) "Max 2 photos reached" else "Upload Photo"
-                            )
+                            Text("Upload Photo")
                         }
                     }
 
@@ -718,7 +728,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Version", color = TextSecondary)
-                    Text("1.4.2", color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text(com.graberhub.companion.BuildConfig.VERSION_NAME, color = TextPrimary, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -737,6 +747,76 @@ fun SettingsScreen(viewModel: MainViewModel) {
             },
             onDismiss = { showColorPicker = null }
         )
+    }
+
+    // Photo name dialog (shown after picking a photo)
+    if (showPhotoNameDialog && pendingPhotoUri != null) {
+        Dialog(onDismissRequest = { showPhotoNameDialog = false; pendingPhotoUri = null }) {
+            Surface(shape = RoundedCornerShape(16.dp), color = CardBackground) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Name This Photo", style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = photoNameInput,
+                        onValueChange = { photoNameInput = it },
+                        label = { Text("Photo Name (optional)") },
+                        placeholder = { Text("e.g. Family Beach Day") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showPhotoNameDialog = false; pendingPhotoUri = null }) {
+                            Text("Cancel")
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                pendingPhotoUri?.let { uri ->
+                                    viewModel.uploadPhoto(uri, photoNameInput.trim())
+                                }
+                                showPhotoNameDialog = false
+                                pendingPhotoUri = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
+                        ) { Text("Upload") }
+                    }
+                }
+            }
+        }
+    }
+
+    // Rename photo dialog
+    if (renamingPhoto != null) {
+        Dialog(onDismissRequest = { renamingPhoto = null }) {
+            Surface(shape = RoundedCornerShape(16.dp), color = CardBackground) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Rename Photo", style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = renameInput,
+                        onValueChange = { renameInput = it },
+                        label = { Text("Photo Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { renamingPhoto = null }) { Text("Cancel") }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                renamingPhoto?.let { photo ->
+                                    viewModel.renamePhoto(photo.filename, renameInput.trim())
+                                }
+                                renamingPhoto = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ShedBlue)
+                        ) { Text("Save") }
+                    }
+                }
+            }
+        }
     }
 
     // Add verse dialog

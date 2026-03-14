@@ -12,8 +12,8 @@ android {
         applicationId = "com.graberhub.companion"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.4.2"
+        versionCode = 21
+        versionName = "1.4.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -27,6 +27,12 @@ android {
             )
         }
     }
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "graber-hub-${versionName}.apk"
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -36,6 +42,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

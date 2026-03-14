@@ -549,27 +549,8 @@ private fun TemplatePickerDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Built-in templates
-                builtInScheduleTemplates.forEach { template ->
-                    TemplateRow(
-                        template = template,
-                        isCustom = false,
-                        onClick = { onApply(template) },
-                        onDelete = {}
-                    )
-                }
-
                 // Custom templates
                 if (customTemplates.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    HorizontalDivider(color = DividerColor)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "My Templates",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
                     customTemplates.forEach { template ->
                         TemplateRow(
                             template = template,

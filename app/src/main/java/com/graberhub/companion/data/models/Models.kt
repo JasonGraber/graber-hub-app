@@ -7,7 +7,8 @@ data class DashboardResponse(
     val schedule: List<ScheduleBlock>,
     val countdowns: List<Countdown>,
     val verse: Verse?,
-    val date: String
+    val date: String,
+    val data_version: Int? = null
 )
 
 data class Kid(
@@ -153,9 +154,11 @@ data class PhotoSettingsRequest(
 
 data class UploadedPhoto(
     val filename: String,
+    val name: String = "",
     val url: String,
     val size: Long = 0L,
-    val modified: String? = null
+    val modified: String? = null,
+    val uploaded: String? = null
 )
 
 // ── Schedule Templates (local + custom) ───────────────────

@@ -273,8 +273,8 @@ private fun AddCountdownDialog(
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = Calendar.getInstance().apply {
-                set(year, month, day)
+            initialSelectedDateMillis = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                set(year, month, day, 12, 0, 0)
             }.timeInMillis
         )
         DatePickerDialog(
@@ -282,7 +282,7 @@ private fun AddCountdownDialog(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val cal = Calendar.getInstance().apply { timeInMillis = millis }
+                        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = millis }
                         year = cal.get(Calendar.YEAR)
                         month = cal.get(Calendar.MONTH)
                         day = cal.get(Calendar.DAY_OF_MONTH)

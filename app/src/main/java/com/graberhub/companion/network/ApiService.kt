@@ -97,6 +97,9 @@ interface ApiService {
     @POST("api.php/photos")
     suspend fun uploadPhoto(@Part photo: MultipartBody.Part): Response<ApiResponse>
 
+    @PUT("api.php/photos/{filename}")
+    suspend fun renameUploadedPhoto(@Path("filename") filename: String, @Body body: Map<String, String>): Response<ApiResponse>
+
     @DELETE("api.php/photos/{filename}")
     suspend fun deleteUploadedPhoto(@Path("filename") filename: String): Response<ApiResponse>
 

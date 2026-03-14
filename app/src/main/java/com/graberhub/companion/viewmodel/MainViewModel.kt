@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.Response
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -103,6 +104,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _photoSource = MutableStateFlow(prefs.photoSource)
     val photoSource: StateFlow<String> = _photoSource.asStateFlow()
 
+    // ── Data version tracking (prevents stale writes) ──────
+    private val _dataVersion = MutableStateFlow(0)
+    val dataVersion: StateFlow<Int> = _dataVersion.asStateFlow()
+
+    /** True only after loadDashboard() succeeds. Blocks all write ops until fresh data is loaded. */
+    private val _dataReady = MutableStateFlow(false)
+    val dataReady: StateFlow<Boolean> = _dataReady.asStateFlow()
+
     private var displayModePollJob: Job? = null
     private var timerTickJob: Job? = null
     private var alarmAutoStopJob: Job? = null
@@ -134,6 +143,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         try {
             getApplication<Application>().unregisterReceiver(alarmStopReceiver)
         } catch (_: Exception) {}
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+
+    /**
+     * Guard that blocks write operations until fresh data has been loaded.
+     * Returns true if ready; sets error and returns false otherwise.
+     */
+    private fun requireDataReady(): Boolean {
+        if (!_dataReady.value) {
+            _error.value = "Please wait — syncing with hub..."
+            return false
+        }
+        return true
+    }
+
+    /**
+     * Update the local data version from a dashboard response and sync to RetrofitClient.
+     */
+    private fun updateDataVersion(version: Int?) {
+        if (version != null && version > 0) {
+            _dataVersion.value = version
+            RetrofitClient.dataVersion.set(version)
+            Log.d("MainViewModel", "Data version updated to $version")
+        }
+    }
+
+    /**
+     * Check if a Retrofit response is a 409 Conflict (stale version).
+     * If so, refresh dashboard and return true so the caller can retry.
+     */
+    private suspend fun <T> handle409(response: Response<T>): Boolean {
+        if (response.code() == 409) {
+            Log.w("MainViewModel", "409 Conflict — data version is stale, refreshing...")
+            _error.value = "Data was updated on another device. Refreshing..."
+            // Refresh dashboard to get latest data + version
+            try {
+                val dashResponse = RetrofitClient.getApiService().getDashboard()
+                if (dashResponse.isSuccessful) {
+                    dashResponse.body()?.let { dashboard ->
+                        _kids.value = dashboard.kids
+                        _schedule.value = dashboard.schedule.sortedBy { it.time_start }
+                        _countdowns.value = dashboard.countdowns
+                        _verse.value = dashboard.verse
+                        updateDataVersion(dashboard.data_version)
+                        _dataReady.value = true
+                    }
+                    _connectionState.value = ConnectionState.CONNECTED
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Failed to refresh after 409: ${e.message}")
+            }
+            return true
+        }
+        return false
     }
 
     private fun startDisplayModePoll() {
@@ -181,6 +245,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _connectionState.value = ConnectionState.CONNECTING
             _connectionStatus.value = "Connecting..."
+            // Reset data readiness on reconnect — must re-fetch before edits
+            _dataReady.value = false
 
             // Try saved URL first
             val savedUrl = prefs.serverUrl
@@ -237,6 +303,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _schedule.value = dashboard.schedule.sortedBy { it.time_start }
                         _countdowns.value = dashboard.countdowns
                         _verse.value = dashboard.verse
+                        updateDataVersion(dashboard.data_version)
+                        _dataReady.value = true
                     }
                     _connectionState.value = ConnectionState.CONNECTED
                 } else {
@@ -254,9 +322,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Chores ─────────────────────────────────────────────
 
     fun toggleChore(choreId: Int) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().toggleChore(choreId, today())
+                val response = RetrofitClient.getApiService().toggleChore(choreId, today())
+                if (handle409(response)) {
+                    // Retry once after refresh
+                    RetrofitClient.getApiService().toggleChore(choreId, today())
+                }
                 loadDashboard()
             } catch (_: Exception) {
                 _error.value = "Failed to update chore"
@@ -265,11 +338,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addChore(kidId: Int, title: String, emoji: String = "") {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().createChore(
-                    CreateChoreRequest(kidId, title, today(), emoji)
-                )
+                val request = CreateChoreRequest(kidId, title, today(), emoji)
+                val response = RetrofitClient.getApiService().createChore(request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().createChore(request)
+                }
                 loadDashboard()
             } catch (_: Exception) {
                 _error.value = "Failed to add chore"
@@ -278,9 +354,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun editChore(choreId: Int, title: String, emoji: String) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().updateChore(choreId, UpdateChoreRequest(title, emoji))
+                val request = UpdateChoreRequest(title, emoji)
+                val response = RetrofitClient.getApiService().updateChore(choreId, request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().updateChore(choreId, request)
+                }
                 loadDashboard()
             } catch (_: Exception) {
                 _error.value = "Failed to edit chore"
@@ -289,9 +370,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteChore(choreId: Int) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().deleteChore(choreId, today())
+                val response = RetrofitClient.getApiService().deleteChore(choreId, today())
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().deleteChore(choreId, today())
+                }
                 loadDashboard()
             } catch (_: Exception) {
                 _error.value = "Failed to delete chore"
@@ -302,11 +387,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Schedule ───────────────────────────────────────────
 
     fun addScheduleBlock(timeStart: String, timeEnd: String, title: String, emoji: String) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().createScheduleBlock(
-                    CreateScheduleRequest(timeStart, timeEnd, title, emoji, today())
-                )
+                val request = CreateScheduleRequest(timeStart, timeEnd, title, emoji, today())
+                val response = RetrofitClient.getApiService().createScheduleBlock(request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().createScheduleBlock(request)
+                }
                 loadDashboard()
             } catch (_: Exception) {
                 _error.value = "Failed to add schedule block"
@@ -315,11 +403,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun editScheduleBlock(blockId: Int, title: String, emoji: String, timeStart: String, timeEnd: String) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().updateScheduleBlock(
-                    blockId, UpdateScheduleRequest(title, emoji, timeStart, timeEnd)
-                )
+                val request = UpdateScheduleRequest(title, emoji, timeStart, timeEnd)
+                val response = RetrofitClient.getApiService().updateScheduleBlock(blockId, request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().updateScheduleBlock(blockId, request)
+                }
                 loadDashboard()
             } catch (_: Exception) {
                 _error.value = "Failed to edit schedule block"
@@ -328,9 +419,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteScheduleBlock(blockId: Int) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().deleteScheduleBlock(blockId, today())
+                val response = RetrofitClient.getApiService().deleteScheduleBlock(blockId, today())
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().deleteScheduleBlock(blockId, today())
+                }
                 loadDashboard()
             } catch (_: Exception) {
                 _error.value = "Failed to delete schedule block"
@@ -339,12 +434,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun applyTemplate() {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
                 val blocks = _schedule.value.map {
                     CreateScheduleRequest(it.time_start, it.time_end, it.title, it.emoji)
                 }
-                RetrofitClient.getApiService().applyTemplate(TemplateRequest(blocks))
+                val request = TemplateRequest(blocks)
+                val response = RetrofitClient.getApiService().applyTemplate(request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().applyTemplate(request)
+                }
                 _error.value = null
                 loadDashboard()
             } catch (_: Exception) {
@@ -404,11 +504,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addCountdown(label: String, emoji: String, targetDate: String) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().createCountdown(
-                    CreateCountdownRequest(label, emoji, targetDate)
-                )
+                val request = CreateCountdownRequest(label, emoji, targetDate)
+                val response = RetrofitClient.getApiService().createCountdown(request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().createCountdown(request)
+                }
                 loadCountdowns()
             } catch (_: Exception) {
                 _error.value = "Failed to add countdown"
@@ -417,9 +520,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteCountdown(id: Int) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().deleteCountdown(id)
+                val response = RetrofitClient.getApiService().deleteCountdown(id)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().deleteCountdown(id)
+                }
                 loadCountdowns()
             } catch (_: Exception) {
                 _error.value = "Failed to delete countdown"
@@ -456,6 +563,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setActiveVerse(id: Int) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.getApiService().setActiveVerse(id)
@@ -469,6 +577,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearActiveVerse() {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.getApiService().clearActiveVerse()
@@ -482,9 +591,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addVerse(text: String, reference: String) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().createVerse(CreateVerseRequest(text, reference))
+                val request = CreateVerseRequest(text, reference)
+                val response = RetrofitClient.getApiService().createVerse(request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().createVerse(request)
+                }
                 loadVerses()
             } catch (_: Exception) {
                 _error.value = "Failed to add verse"
@@ -493,9 +607,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun editVerse(id: Int, text: String, reference: String) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().updateVerse(id, UpdateVerseRequest(text, reference))
+                val request = UpdateVerseRequest(text, reference)
+                val response = RetrofitClient.getApiService().updateVerse(id, request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().updateVerse(id, request)
+                }
                 loadVerses()
             } catch (_: Exception) {
                 _error.value = "Failed to edit verse"
@@ -504,9 +623,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteVerse(id: Int) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().deleteVerse(id)
+                val response = RetrofitClient.getApiService().deleteVerse(id)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().deleteVerse(id)
+                }
                 _verses.value = _verses.value.filter { it.id != id }
                 if (_activeVerseId.value == id) _activeVerseId.value = null
             } catch (_: Exception) {
@@ -533,9 +656,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startTimer(minutes: Int, label: String) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().createTimer(CreateTimerRequest(minutes, label))
+                val request = CreateTimerRequest(minutes, label)
+                val response = RetrofitClient.getApiService().createTimer(request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().createTimer(request)
+                }
                 _timerFinished.value = false
                 loadTimer()
             } catch (_: Exception) {
@@ -545,9 +673,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cancelTimer() {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                RetrofitClient.getApiService().deleteTimer()
+                val response = RetrofitClient.getApiService().deleteTimer()
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().deleteTimer()
+                }
                 timerTickJob?.cancel()
                 timerTickJob = null
                 _timerStatus.value = null
@@ -624,6 +756,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.serverUrl = url
         RetrofitClient.init(prefs.serverUrl)
         updateActiveNetworkLabel()
+        _dataReady.value = false
         loadDashboard()
     }
 
@@ -635,6 +768,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _connectionState.value = ConnectionState.CONNECTING
             _connectionStatus.value = "Connecting..."
+            _dataReady.value = false
 
             prefs.serverUrl = url
             RetrofitClient.init(prefs.serverUrl)
@@ -676,6 +810,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateKidColor(kidId: Int, colorHex: String) {
+        if (!requireDataReady()) return
         val updatedConfigs = _kidsConfig.value.map {
             if (it.id == kidId) it.copy(color = colorHex) else it
         }
@@ -765,7 +900,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun uploadPhoto(uri: Uri) {
+    fun uploadPhoto(uri: Uri, name: String = "") {
         viewModelScope.launch {
             _photoUploadInProgress.value = true
             try {
@@ -785,8 +920,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val requestBody = bytes.toRequestBody(mimeType.toMediaType())
                 val part = MultipartBody.Part.createFormData("photo", "upload.$extension", requestBody)
 
+                // Build multipart body with optional name field
+                val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
+                builder.addPart(part)
+                if (name.isNotBlank()) {
+                    builder.addFormDataPart("name", name)
+                }
+
                 val response = RetrofitClient.getApiService().uploadPhoto(part)
                 if (response.isSuccessful) {
+                    // If we have a name but couldn't send it via multipart, rename after upload
+                    if (name.isNotBlank()) {
+                        try {
+                            // Reload photos to get the new filename, then rename
+                            loadPhotos()
+                            // Find the newest photo and rename it
+                            val latestPhoto = _photos.value.maxByOrNull { it.modified ?: "" }
+                            if (latestPhoto != null) {
+                                renamePhoto(latestPhoto.filename, name)
+                            }
+                        } catch (_: Exception) {}
+                    }
                     loadPhotos()
                 } else {
                     _error.value = "Upload failed: ${response.code()}"
@@ -799,17 +953,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun renamePhoto(filename: String, name: String) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.getApiService().renameUploadedPhoto(filename, mapOf("name" to name))
+                if (response.isSuccessful) {
+                    loadPhotos()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun deleteUploadedPhoto(filename: String) {
         viewModelScope.launch {
             try {
+                // Optimistic local removal
+                _photos.value = _photos.value.filter { it.filename != filename }
                 val response = RetrofitClient.getApiService().deleteUploadedPhoto(filename)
                 if (response.isSuccessful) {
-                    _photos.value = _photos.value.filter { it.filename != filename }
+                    // Force refresh from server to confirm
+                    loadPhotos()
                 } else {
                     _error.value = "Delete failed: ${response.code()}"
+                    loadPhotos() // Refresh to restore if server rejected
                 }
             } catch (e: Exception) {
                 _error.value = "Delete failed: ${e.message}"
+                loadPhotos() // Refresh to restore actual state
             }
         }
     }
@@ -835,9 +1005,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun createChoreTemplate(request: CreateChoreTemplateRequest) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.getApiService().createChoreTemplate(request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().createChoreTemplate(request)
+                }
                 if (response.isSuccessful) {
                     loadChoreTemplates()
                 } else {
@@ -850,9 +1024,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateChoreTemplate(id: Int, request: UpdateChoreTemplateRequest) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.getApiService().updateChoreTemplate(id, request)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().updateChoreTemplate(id, request)
+                }
                 if (response.isSuccessful) {
                     loadChoreTemplates()
                 } else {
@@ -865,9 +1043,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteChoreTemplate(id: Int) {
+        if (!requireDataReady()) return
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.getApiService().deleteChoreTemplate(id)
+                if (handle409(response)) {
+                    RetrofitClient.getApiService().deleteChoreTemplate(id)
+                }
                 if (response.isSuccessful) {
                     _choreTemplates.value = _choreTemplates.value.filter { it.id != id }
                 } else {

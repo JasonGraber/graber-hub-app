@@ -1,11 +1,14 @@
 package com.graberhub.companion.network
 
 import android.util.Log
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 object RetrofitClient {
 
@@ -13,6 +16,9 @@ object RetrofitClient {
     private var baseUrl = "http://192.168.86.43/"
     private var retrofit: Retrofit? = null
     private var apiService: ApiService? = null
+
+    /** Thread-safe store for the latest data version from the server. */
+    val dataVersion = AtomicInteger(0)
 
     fun init(serverUrl: String) {
         val url = if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/"
@@ -25,6 +31,44 @@ object RetrofitClient {
         }
     }
 
+    /**
+     * Interceptor that attaches X-Data-Version header to all POST/PUT/DELETE requests
+     * so the server can reject stale writes with 409.
+     */
+    private val versionRequestInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        val method = request.method.uppercase()
+        if (method in listOf("POST", "PUT", "DELETE")) {
+            val version = dataVersion.get()
+            if (version > 0) {
+                val newRequest = request.newBuilder()
+                    .addHeader("X-Data-Version", version.toString())
+                    .build()
+                return@Interceptor chain.proceed(newRequest)
+            }
+        }
+        chain.proceed(request)
+    }
+
+    /**
+     * Interceptor that reads X-Data-Version from every response and updates our local store.
+     */
+    private val versionResponseInterceptor = Interceptor { chain ->
+        val response = chain.proceed(chain.request())
+        val versionHeader = response.header("X-Data-Version")
+        if (versionHeader != null) {
+            try {
+                val serverVersion = versionHeader.toInt()
+                // Only move forward, never backward
+                dataVersion.updateAndGet { current -> maxOf(current, serverVersion) }
+                Log.d(TAG, "Updated data version from header: $serverVersion")
+            } catch (_: NumberFormatException) {
+                Log.w(TAG, "Invalid X-Data-Version header: $versionHeader")
+            }
+        }
+        response
+    }
+
     private fun getRetrofit(): Retrofit {
         if (retrofit == null) {
             Log.d(TAG, "Building new Retrofit instance with baseUrl=$baseUrl")
@@ -34,7 +78,9 @@ object RetrofitClient {
                 level = HttpLoggingInterceptor.Level.BODY
             }
             val client = OkHttpClient.Builder()
+                .addInterceptor(versionRequestInterceptor)
                 .addInterceptor(logging)
+                .addInterceptor(versionResponseInterceptor)
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(15, TimeUnit.SECONDS)
