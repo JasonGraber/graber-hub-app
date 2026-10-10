@@ -65,7 +65,8 @@ data class KidConfig(
 data class ApiResponse(
     val success: Boolean,
     val message: String? = null,
-    val id: Int? = null
+    val id: Int? = null,
+    val data_version: Int? = null
 )
 
 // Request models
@@ -179,6 +180,7 @@ data class ChoreTemplate(
     val emoji: String = "",
     val repeat: String = "none",          // "daily" | "weekly" | "monthly" | "none"
     val days_of_week: List<Int> = emptyList(),  // 0=Sun, 6=Sat
+    val week_interval: Int = 1,            // 1, 2, or 4 weeks
     val every_other_week: Boolean = false,
     val days_of_month: List<Int> = emptyList(), // 1-31
     val start_date: String? = null,
@@ -192,6 +194,7 @@ data class CreateChoreTemplateRequest(
     val emoji: String = "",
     val repeat: String = "none",
     val days_of_week: List<Int> = emptyList(),
+    val week_interval: Int = 1,
     val every_other_week: Boolean = false,
     val days_of_month: List<Int> = emptyList(),
     val start_date: String? = null,
@@ -203,6 +206,7 @@ data class UpdateChoreTemplateRequest(
     val emoji: String = "",
     val repeat: String = "none",
     val days_of_week: List<Int> = emptyList(),
+    val week_interval: Int = 1,
     val every_other_week: Boolean = false,
     val days_of_month: List<Int> = emptyList(),
     val start_date: String? = null,

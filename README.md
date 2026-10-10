@@ -13,7 +13,7 @@ Control your family's schedule, chores, countdowns, and display mode — all fro
 ## ✨ Features
 
 - **📅 Schedule** — View, add, edit, and delete daily schedule blocks with emoji and time pickers. Includes school day, weekend, and summer templates.
-- **✅ Chores** — Manage per-kid chores with tap-to-complete. Assign chores to any kid with emoji categories.
+- **✅ Chores** — Manage per-kid chores with tap-to-complete and recurring templates, including every 1, 2, or 4 weeks.
 - **⏳ Countdowns** — Track upcoming events with animated countdown cards.
 - **⏱️ Timer** — Start countdown timers on the Hub display with alarm sound.
 - **📺 Display Mode** — Switch the Hub between Dashboard, Photos, and Auto modes. Persistent mode indicator shows current state on every screen.

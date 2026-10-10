@@ -992,14 +992,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.getApiService().createChoreTemplate(request)
+                var response = RetrofitClient.getApiService().createChoreTemplate(request)
                 if (handle409(response)) {
-                    RetrofitClient.getApiService().createChoreTemplate(request)
+                    response = RetrofitClient.getApiService().createChoreTemplate(request)
                 }
                 if (response.isSuccessful) {
+                    updateDataVersion(response.body()?.data_version)
                     loadChoreTemplates()
                 } else {
-                    _error.value = "Failed to create template"
+                    _error.value = "Failed to create template (${response.code()})"
                 }
             } catch (e: Exception) {
                 _error.value = "Failed to create template: ${e.message}"
@@ -1011,14 +1012,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.getApiService().updateChoreTemplate(id, request)
+                var response = RetrofitClient.getApiService().updateChoreTemplate(id, request)
                 if (handle409(response)) {
-                    RetrofitClient.getApiService().updateChoreTemplate(id, request)
+                    response = RetrofitClient.getApiService().updateChoreTemplate(id, request)
                 }
                 if (response.isSuccessful) {
+                    updateDataVersion(response.body()?.data_version)
                     loadChoreTemplates()
                 } else {
-                    _error.value = "Failed to update template"
+                    _error.value = "Failed to update template (${response.code()})"
                 }
             } catch (e: Exception) {
                 _error.value = "Failed to update template: ${e.message}"
@@ -1030,14 +1032,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!requireDataReady()) return
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.getApiService().deleteChoreTemplate(id)
+                var response = RetrofitClient.getApiService().deleteChoreTemplate(id)
                 if (handle409(response)) {
-                    RetrofitClient.getApiService().deleteChoreTemplate(id)
+                    response = RetrofitClient.getApiService().deleteChoreTemplate(id)
                 }
                 if (response.isSuccessful) {
+                    updateDataVersion(response.body()?.data_version)
                     _choreTemplates.value = _choreTemplates.value.filter { it.id != id }
                 } else {
-                    _error.value = "Failed to delete template"
+                    _error.value = "Failed to delete template (${response.code()})"
                 }
             } catch (e: Exception) {
                 _error.value = "Failed to delete template: ${e.message}"

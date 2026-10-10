@@ -189,6 +189,7 @@ fun ManageChoresScreen(viewModel: MainViewModel, navController: NavController) {
                         emoji = req.emoji,
                         repeat = req.repeat,
                         days_of_week = req.days_of_week,
+                        week_interval = req.week_interval,
                         every_other_week = req.every_other_week,
                         days_of_month = req.days_of_month,
                         start_date = req.start_date,
@@ -299,7 +300,16 @@ private fun repeatSummary(template: ChoreTemplate): String {
         "weekly" -> {
             val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
             val days = template.days_of_week.sorted().mapNotNull { dayNames.getOrNull(it) }
-            val prefix = if (template.every_other_week) "Every other week" else "Weekly"
+            val interval = when {
+                template.week_interval == 4 -> 4
+                template.week_interval == 2 || template.every_other_week -> 2
+                else -> 1
+            }
+            val prefix = when (interval) {
+                4 -> "Every 4 weeks"
+                2 -> "Every 2 weeks"
+                else -> "Weekly"
+            }
             if (days.isEmpty()) prefix else "$prefix: ${days.joinToString(", ")}"
         }
         "monthly" -> {
@@ -327,7 +337,15 @@ private fun TemplateDialog(
     var repeat by remember { mutableStateOf(template?.repeat ?: "daily") }
     var selectedKidId by remember { mutableStateOf(template?.kid_id ?: kids.firstOrNull()?.id ?: 0) }
     var daysOfWeek by remember { mutableStateOf(template?.days_of_week?.toSet() ?: emptySet()) }
-    var everyOtherWeek by remember { mutableStateOf(template?.every_other_week ?: false) }
+    var weekInterval by remember {
+        mutableIntStateOf(
+            when {
+                template?.week_interval == 4 -> 4
+                template?.week_interval == 2 || template?.every_other_week == true -> 2
+                else -> 1
+            }
+        )
+    }
     var daysOfMonth by remember { mutableStateOf(template?.days_of_month?.toSet() ?: emptySet()) }
     var startDate by remember { mutableStateOf(template?.start_date ?: today) }
     var active by remember { mutableStateOf(template?.active ?: true) }
@@ -471,15 +489,20 @@ private fun TemplateDialog(
                                 }
                             }
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(
-                                checked = everyOtherWeek,
-                                onCheckedChange = { everyOtherWeek = it },
-                                modifier = Modifier.height(24.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("Every other week", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                        Spacer(Modifier.height(10.dp))
+                        Text("Frequency:", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                        Spacer(Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(1 to "Every week", 2 to "Every 2 weeks", 4 to "Every 4 weeks").forEach { (interval, label) ->
+                                FilterChip(
+                                    selected = weekInterval == interval,
+                                    onClick = { weekInterval = interval },
+                                    label = { Text(label, maxLines = 1) }
+                                )
+                            }
                         }
                     }
                 }
@@ -568,7 +591,8 @@ private fun TemplateDialog(
                                             emoji = emoji,
                                             repeat = repeat,
                                             days_of_week = daysOfWeek.sorted(),
-                                            every_other_week = everyOtherWeek,
+                                            week_interval = weekInterval,
+                                            every_other_week = weekInterval == 2,
                                             days_of_month = daysOfMonth.sorted(),
                                             start_date = startDate.ifBlank { null },
                                             active = active
