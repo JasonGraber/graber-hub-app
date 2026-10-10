@@ -48,7 +48,7 @@ cd graber-hub-app
 ./gradlew assembleDebug
 ```
 
-APK output: `app/build/outputs/apk/debug/app-debug.apk`
+APK output: `app/build/outputs/apk/debug/graber-hub-<version>.apk`
 
 ### Configure
 On first launch, the app connects to the Hub at `192.168.86.43` (default). Use Settings to:

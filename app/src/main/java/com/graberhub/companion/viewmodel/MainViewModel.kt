@@ -6,8 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
-import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.graberhub.companion.alarm.AlarmService
@@ -112,6 +112,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _dataReady = MutableStateFlow(false)
     val dataReady: StateFlow<Boolean> = _dataReady.asStateFlow()
 
+    private val _choreMutationInProgress = MutableStateFlow(false)
+    val choreMutationInProgress: StateFlow<Boolean> = _choreMutationInProgress.asStateFlow()
+
     private var displayModePollJob: Job? = null
     private var timerTickJob: Job? = null
     private var alarmAutoStopJob: Job? = null
@@ -130,11 +133,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         startDisplayModePoll()
 
         val filter = IntentFilter(AlarmService.ACTION_STOP)
-        if (Build.VERSION.SDK_INT >= 33) {
-            getApplication<Application>().registerReceiver(alarmStopReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            getApplication<Application>().registerReceiver(alarmStopReceiver, filter)
-        }
+        ContextCompat.registerReceiver(
+            getApplication<Application>(),
+            alarmStopReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     override fun onCleared() {
@@ -178,26 +182,79 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (response.code() == 409) {
             Log.w("MainViewModel", "409 Conflict — data version is stale, refreshing...")
             _error.value = "Data was updated on another device. Refreshing..."
-            // Refresh dashboard to get latest data + version
-            try {
-                val dashResponse = RetrofitClient.getApiService().getDashboard()
-                if (dashResponse.isSuccessful) {
-                    dashResponse.body()?.let { dashboard ->
-                        _kids.value = dashboard.kids
-                        _schedule.value = dashboard.schedule.sortedBy { it.time_start }
-                        _countdowns.value = dashboard.countdowns
-                        _verse.value = dashboard.verse
-                        updateDataVersion(dashboard.data_version)
-                        _dataReady.value = true
-                    }
-                    _connectionState.value = ConnectionState.CONNECTED
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Failed to refresh after 409: ${e.message}")
-            }
-            return true
+            return refreshDashboard()
         }
         return false
+    }
+
+    /** Fetch and apply one coherent dashboard snapshot. */
+    private suspend fun refreshDashboard(showLoading: Boolean = false): Boolean {
+        if (showLoading) _isLoading.value = true
+        return try {
+            val response = RetrofitClient.getApiService().getDashboard()
+            val dashboard = response.body()
+            if (!response.isSuccessful || dashboard == null) {
+                _error.value = "Server error: ${response.code()}"
+                false
+            } else {
+                _kids.value = dashboard.kids
+                _schedule.value = dashboard.schedule.sortedBy { it.time_start }
+                _countdowns.value = dashboard.countdowns
+                _verse.value = dashboard.verse
+                updateDataVersion(dashboard.data_version)
+                _dataReady.value = true
+                _connectionState.value = ConnectionState.CONNECTED
+                true
+            }
+        } catch (e: Exception) {
+            _error.value = "Connection failed: ${e.message}"
+            _connectionState.value = ConnectionState.FAILED
+            false
+        } finally {
+            if (showLoading) _isLoading.value = false
+        }
+    }
+
+    /**
+     * Run one chore mutation at a time, retry a stale write once, and never hide HTTP failures.
+     */
+    private fun launchChoreMutation(
+        action: String,
+        request: suspend () -> Response<ApiResponse>
+    ) {
+        if (!requireDataReady()) return
+        // Set this before launching so a second tap in the same UI frame is ignored instead
+        // of being queued and replayed as a duplicate mutation.
+        if (_choreMutationInProgress.value) return
+        _choreMutationInProgress.value = true
+        viewModelScope.launch {
+            try {
+                var response = request()
+                if (response.code() == 409) {
+                    if (!handle409(response)) {
+                        _error.value = "$action could not sync with the hub"
+                        return@launch
+                    }
+                    response = request()
+                }
+
+                if (!response.isSuccessful) {
+                    _error.value = "$action failed (${response.code()})"
+                    return@launch
+                }
+
+                if (refreshDashboard()) {
+                    _error.value = null
+                } else {
+                    _error.value = "$action saved, but the latest chores could not be refreshed"
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "$action failed", e)
+                _error.value = "$action failed: ${e.message ?: "connection error"}"
+            } finally {
+                _choreMutationInProgress.value = false
+            }
+        }
     }
 
     private fun startDisplayModePoll() {
@@ -293,94 +350,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadDashboard() {
         viewModelScope.launch {
-            try {
-                _isLoading.value = true
-                _error.value = null
-                val response = RetrofitClient.getApiService().getDashboard()
-                if (response.isSuccessful) {
-                    response.body()?.let { dashboard ->
-                        _kids.value = dashboard.kids
-                        _schedule.value = dashboard.schedule.sortedBy { it.time_start }
-                        _countdowns.value = dashboard.countdowns
-                        _verse.value = dashboard.verse
-                        updateDataVersion(dashboard.data_version)
-                        _dataReady.value = true
-                    }
-                    _connectionState.value = ConnectionState.CONNECTED
-                } else {
-                    _error.value = "Server error: ${response.code()}"
-                }
-            } catch (e: Exception) {
-                _error.value = "Connection failed: ${e.message}"
-                _connectionState.value = ConnectionState.FAILED
-            } finally {
-                _isLoading.value = false
-            }
+            _error.value = null
+            refreshDashboard(showLoading = true)
         }
     }
 
     // ── Chores ─────────────────────────────────────────────
 
     fun toggleChore(choreId: Int) {
-        if (!requireDataReady()) return
-        viewModelScope.launch {
-            try {
-                val response = RetrofitClient.getApiService().toggleChore(choreId, today())
-                if (handle409(response)) {
-                    // Retry once after refresh
-                    RetrofitClient.getApiService().toggleChore(choreId, today())
-                }
-                loadDashboard()
-            } catch (_: Exception) {
-                _error.value = "Failed to update chore"
-            }
+        launchChoreMutation("Update chore") {
+            RetrofitClient.getApiService().toggleChore(choreId, today())
         }
     }
 
     fun addChore(kidId: Int, title: String, emoji: String = "") {
-        if (!requireDataReady()) return
-        viewModelScope.launch {
-            try {
-                val request = CreateChoreRequest(kidId, title, today(), emoji)
-                val response = RetrofitClient.getApiService().createChore(request)
-                if (handle409(response)) {
-                    RetrofitClient.getApiService().createChore(request)
-                }
-                loadDashboard()
-            } catch (_: Exception) {
-                _error.value = "Failed to add chore"
-            }
+        val request = CreateChoreRequest(kidId, title.trim(), today(), emoji)
+        launchChoreMutation("Add chore") {
+            RetrofitClient.getApiService().createChore(request)
         }
     }
 
     fun editChore(choreId: Int, title: String, emoji: String) {
-        if (!requireDataReady()) return
-        viewModelScope.launch {
-            try {
-                val request = UpdateChoreRequest(title, emoji)
-                val response = RetrofitClient.getApiService().updateChore(choreId, request)
-                if (handle409(response)) {
-                    RetrofitClient.getApiService().updateChore(choreId, request)
-                }
-                loadDashboard()
-            } catch (_: Exception) {
-                _error.value = "Failed to edit chore"
-            }
+        val request = UpdateChoreRequest(title.trim(), emoji)
+        launchChoreMutation("Edit chore") {
+            RetrofitClient.getApiService().updateChore(choreId, request)
         }
     }
 
     fun deleteChore(choreId: Int) {
-        if (!requireDataReady()) return
-        viewModelScope.launch {
-            try {
-                val response = RetrofitClient.getApiService().deleteChore(choreId, today())
-                if (handle409(response)) {
-                    RetrofitClient.getApiService().deleteChore(choreId, today())
-                }
-                loadDashboard()
-            } catch (_: Exception) {
-                _error.value = "Failed to delete chore"
-            }
+        launchChoreMutation("Delete chore") {
+            RetrofitClient.getApiService().deleteChore(choreId, today())
         }
     }
 

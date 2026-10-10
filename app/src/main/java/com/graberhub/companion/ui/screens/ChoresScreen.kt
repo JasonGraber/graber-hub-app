@@ -41,6 +41,7 @@ fun ChoresScreen(viewModel: MainViewModel, navController: NavController? = null)
     val kids by viewModel.kids.collectAsStateWithLifecycle()
     val kidsConfig by viewModel.kidsConfig.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val choreMutationInProgress by viewModel.choreMutationInProgress.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf<Kid?>(null) }
     var editingChore by remember { mutableStateOf<Chore?>(null) }
 
@@ -55,25 +56,36 @@ fun ChoresScreen(viewModel: MainViewModel, navController: NavController? = null)
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "✅ Chores",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (navController != null) {
-                            IconButton(onClick = { navController.navigate(Screen.ManageChores.route) }) {
-                                Icon(
-                                    Icons.Default.Settings,
-                                    contentDescription = "Manage Templates",
-                                    tint = TextSecondary
-                                )
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "✅ Chores",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (navController != null) {
+                                IconButton(
+                                    onClick = { navController.navigate(Screen.ManageChores.route) },
+                                    enabled = !choreMutationInProgress
+                                ) {
+                                    Icon(
+                                        Icons.Default.Settings,
+                                        contentDescription = "Manage Templates",
+                                        tint = TextSecondary
+                                    )
+                                }
                             }
+                        }
+                        if (choreMutationInProgress) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                color = ShedBlue
+                            )
                         }
                     }
                 }
@@ -87,6 +99,7 @@ fun ChoresScreen(viewModel: MainViewModel, navController: NavController? = null)
                     KidChoreCard(
                         kid = kid,
                         kidColor = color,
+                        enabled = !choreMutationInProgress,
                         onToggleChore = { viewModel.toggleChore(it.id) },
                         onAddChore = { showAddDialog = kid },
                         onEditChore = { editingChore = it },
@@ -130,6 +143,7 @@ fun ChoresScreen(viewModel: MainViewModel, navController: NavController? = null)
 private fun KidChoreCard(
     kid: Kid,
     kidColor: Color,
+    enabled: Boolean,
     onToggleChore: (Chore) -> Unit,
     onAddChore: () -> Unit,
     onEditChore: (Chore) -> Unit,
@@ -172,7 +186,7 @@ private fun KidChoreCard(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                IconButton(onClick = onAddChore) {
+                IconButton(onClick = onAddChore, enabled = enabled) {
                     Icon(Icons.Default.Add, contentDescription = "Add Chore", tint = kidColor)
                 }
             }
@@ -190,6 +204,7 @@ private fun KidChoreCard(
                     ChoreItem(
                         chore = chore,
                         kidColor = kidColor,
+                        enabled = enabled,
                         onToggle = { onToggleChore(chore) },
                         onEdit = { onEditChore(chore) },
                         onDelete = { onDeleteChore(chore) }
@@ -204,6 +219,7 @@ private fun KidChoreCard(
 private fun ChoreItem(
     chore: Chore,
     kidColor: Color,
+    enabled: Boolean,
     onToggle: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -223,7 +239,7 @@ private fun ChoreItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onToggle() }
+                .clickable(enabled = enabled) { onToggle() }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -269,10 +285,10 @@ private fun ChoreItem(
             )
 
             // Edit / Delete
-            IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+            IconButton(onClick = onEdit, enabled = enabled, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextHint, modifier = Modifier.size(16.dp))
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+            IconButton(onClick = onDelete, enabled = enabled, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = TextHint, modifier = Modifier.size(16.dp))
             }
         }
