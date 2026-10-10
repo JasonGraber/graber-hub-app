@@ -11,13 +11,22 @@ class PrefsManager(context: Context) {
     private val prefs = context.getSharedPreferences("graber_hub_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
 
+    init {
+        // The Pi received a new DHCP address. Migrate existing installs that
+        // still have the old home-WiFi address saved.
+        if (prefs.getString(KEY_SERVER_URL, null) == LEGACY_HOME_URL) {
+            prefs.edit().putString(KEY_SERVER_URL, HOME_URL).apply()
+        }
+    }
+
     companion object {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_KIDS = "kids_config"
         private const val KEY_CUSTOM_SCHEDULE_TEMPLATES = "custom_schedule_templates"
         private const val KEY_PHOTO_SOURCE = "photo_source"
 
-        const val HOME_URL = "http://192.168.86.43/"
+        private const val LEGACY_HOME_URL = "http://192.168.86.43/"
+        const val HOME_URL = "http://192.168.86.24/"
         const val TAILSCALE_URL = "http://100.72.250.82/"
         const val DEFAULT_SERVER = HOME_URL
 

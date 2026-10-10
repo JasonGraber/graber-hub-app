@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object RetrofitClient {
 
     private const val TAG = "RetrofitClient"
-    private var baseUrl = "http://192.168.86.43/"
+    private var baseUrl = "http://192.168.86.24/"
     private var retrofit: Retrofit? = null
     private var apiService: ApiService? = null
 
