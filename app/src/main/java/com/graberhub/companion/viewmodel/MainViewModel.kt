@@ -16,10 +16,13 @@ import com.graberhub.companion.data.prefs.PrefsManager
 import com.graberhub.companion.network.RetrofitClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -115,7 +118,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _choreMutationInProgress = MutableStateFlow(false)
     val choreMutationInProgress: StateFlow<Boolean> = _choreMutationInProgress.asStateFlow()
 
-    private var displayModePollJob: Job? = null
+    private var autoRefreshJob: Job? = null
+    private var activeScreenRoute: String? = null
+    private val snapshotRefreshMutex = Mutex()
     private var timerTickJob: Job? = null
     private var alarmAutoStopJob: Job? = null
 
@@ -130,7 +135,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateActiveNetworkLabel()
         connectWithFallback()
         loadTimer()
-        startDisplayModePoll()
 
         val filter = IntentFilter(AlarmService.ACTION_STOP)
         ContextCompat.registerReceiver(
@@ -143,7 +147,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        displayModePollJob?.cancel()
+        autoRefreshJob?.cancel()
         try {
             getApplication<Application>().unregisterReceiver(alarmStopReceiver)
         } catch (_: Exception) {}
@@ -187,31 +191,99 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
+    /** Apply a dashboard snapshot only when it is at least as fresh as local state. */
+    private fun applyDashboardSnapshot(dashboard: DashboardResponse): Boolean {
+        val incomingVersion = dashboard.data_version ?: RetrofitClient.dataVersion.get()
+        if (incomingVersion > 0 && incomingVersion < _dataVersion.value) {
+            Log.d(
+                "MainViewModel",
+                "Ignoring older dashboard snapshot $incomingVersion < ${_dataVersion.value}"
+            )
+            return false
+        }
+
+        _kids.value = dashboard.kids
+        _schedule.value = dashboard.schedule.sortedBy { it.time_start }
+        _countdowns.value = dashboard.countdowns
+        _verse.value = dashboard.verse
+
+        val serverKids = dashboard.kids.map { KidConfig(it.id, it.name, it.color) }
+        if (serverKids.isNotEmpty() && serverKids != _kidsConfig.value) {
+            prefs.kidsConfig = serverKids
+            _kidsConfig.value = serverKids
+        }
+
+        updateDataVersion(incomingVersion)
+        _dataReady.value = true
+        _connectionState.value = ConnectionState.CONNECTED
+        return true
+    }
+
     /** Fetch and apply one coherent dashboard snapshot. */
-    private suspend fun refreshDashboard(showLoading: Boolean = false): Boolean {
+    private suspend fun refreshDashboard(
+        showLoading: Boolean = false,
+        reportErrors: Boolean = true
+    ): Boolean = snapshotRefreshMutex.withLock {
         if (showLoading) _isLoading.value = true
-        return try {
+        try {
             val response = RetrofitClient.getApiService().getDashboard()
             val dashboard = response.body()
             if (!response.isSuccessful || dashboard == null) {
-                _error.value = "Server error: ${response.code()}"
+                if (reportErrors) _error.value = "Server error: ${response.code()}"
                 false
             } else {
-                _kids.value = dashboard.kids
-                _schedule.value = dashboard.schedule.sortedBy { it.time_start }
-                _countdowns.value = dashboard.countdowns
-                _verse.value = dashboard.verse
-                updateDataVersion(dashboard.data_version)
-                _dataReady.value = true
+                applyDashboardSnapshot(dashboard)
+            }
+        } catch (e: Exception) {
+            if (reportErrors) {
+                _error.value = "Connection failed: ${e.message}"
+                _connectionState.value = ConnectionState.FAILED
+            } else {
+                Log.d("MainViewModel", "Background dashboard refresh failed: ${e.message}")
+            }
+            false
+        } finally {
+            if (showLoading) _isLoading.value = false
+        }
+    }
+
+    private fun applyTimerSnapshot(status: TimerStatus) {
+        if (status == _timerStatus.value) return
+        val wasActive = _timerStatus.value?.active == true
+        _timerStatus.value = status
+        if (status.active && status.end_time != null) {
+            _timerFinished.value = false
+            startLocalCountdown(status.end_time)
+        } else {
+            timerTickJob?.cancel()
+            timerTickJob = null
+            _timerSecondsLeft.value = 0
+            if (wasActive) {
+                _timerFinished.value = false
+                stopAlarmSound()
+            }
+        }
+    }
+
+    /** Refresh every server-backed main-screen state in one request. */
+    private suspend fun refreshHeartbeat(): Boolean = snapshotRefreshMutex.withLock {
+        return@withLock try {
+            val response = RetrofitClient.getApiService().getHeartbeat()
+            val heartbeat = response.body()
+            if (!response.isSuccessful || heartbeat == null) {
+                Log.d("MainViewModel", "Heartbeat refresh failed: ${response.code()}")
+                false
+            } else {
+                applyDashboardSnapshot(heartbeat.dashboard)
+                applyTimerSnapshot(heartbeat.timer)
+                _displayMode.value = heartbeat.rawMode
+                _photoSettings.value = heartbeat.photoSettings
                 _connectionState.value = ConnectionState.CONNECTED
                 true
             }
         } catch (e: Exception) {
-            _error.value = "Connection failed: ${e.message}"
-            _connectionState.value = ConnectionState.FAILED
+            Log.d("MainViewModel", "Heartbeat refresh failed: ${e.message}")
             false
-        } finally {
-            if (showLoading) _isLoading.value = false
         }
     }
 
@@ -257,24 +329,63 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun startDisplayModePoll() {
-        displayModePollJob?.cancel()
-        displayModePollJob = viewModelScope.launch {
-            while (true) {
+    private suspend fun refreshVisibleScreenExtras() {
+        when (activeScreenRoute) {
+            "manage_chores" -> {
                 try {
-                    val response = RetrofitClient.getApiService().getPhotoSettings()
+                    val response = RetrofitClient.getApiService().getChoreTemplates()
                     if (response.isSuccessful) {
-                        response.body()?.let { settings ->
-                            _displayMode.value = settings.mode ?: "dashboard"
-                            _photoSettings.value = settings
-                        }
+                        _choreTemplates.value = response.body() ?: emptyList()
                     }
                 } catch (e: Exception) {
-                    Log.d("MainViewModel", "Display mode poll failed: ${e.message}")
+                    Log.d("MainViewModel", "Template auto-refresh failed: ${e.message}")
                 }
-                delay(5000)
+            }
+
+            "settings" -> {
+                try {
+                    val api = RetrofitClient.getApiService()
+                    val versesResponse = api.getVerses()
+                    if (versesResponse.isSuccessful) {
+                        _verses.value = versesResponse.body() ?: emptyList()
+                    }
+                    val activeResponse = api.getActiveVerse()
+                    if (activeResponse.isSuccessful) {
+                        _activeVerseId.value = activeResponse.body()?.get("active_verse_id")
+                    }
+                    val photosResponse = api.getPhotos()
+                    if (photosResponse.isSuccessful) {
+                        _photos.value = photosResponse.body() ?: emptyList()
+                    }
+                } catch (e: Exception) {
+                    Log.d("MainViewModel", "Settings auto-refresh failed: ${e.message}")
+                }
             }
         }
+    }
+
+    private suspend fun refreshVisibleData() {
+        refreshHeartbeat()
+        refreshVisibleScreenExtras()
+    }
+
+    fun setActiveScreen(route: String?) {
+        activeScreenRoute = route
+    }
+
+    fun startAutoRefresh() {
+        if (autoRefreshJob?.isActive == true) return
+        autoRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                refreshVisibleData()
+                delay(3000)
+            }
+        }
+    }
+
+    fun stopAutoRefresh() {
+        autoRefreshJob?.cancel()
+        autoRefreshJob = null
     }
 
     private fun initRetrofit() {

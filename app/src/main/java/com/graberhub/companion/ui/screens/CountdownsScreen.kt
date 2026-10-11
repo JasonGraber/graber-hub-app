@@ -34,8 +34,6 @@ fun CountdownsScreen(viewModel: MainViewModel) {
     val countdowns by viewModel.countdowns.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { viewModel.loadCountdowns() }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Text(

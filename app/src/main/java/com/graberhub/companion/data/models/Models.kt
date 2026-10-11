@@ -11,6 +11,15 @@ data class DashboardResponse(
     val data_version: Int? = null
 )
 
+data class HeartbeatResponse(
+    val dashboard: DashboardResponse,
+    val timer: TimerStatus,
+    val mode: String = "dashboard",
+    val rawMode: String = "dashboard",
+    val photoSettings: PhotoSettings,
+    val ts: Long
+)
+
 data class Kid(
     val id: Int,
     val name: String,

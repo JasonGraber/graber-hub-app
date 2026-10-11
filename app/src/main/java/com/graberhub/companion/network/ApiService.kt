@@ -10,6 +10,9 @@ interface ApiService {
     @GET("api.php/dashboard")
     suspend fun getDashboard(): Response<DashboardResponse>
 
+    @GET("api.php/heartbeat")
+    suspend fun getHeartbeat(): Response<HeartbeatResponse>
+
     // Chores
     @POST("api.php/chores")
     suspend fun createChore(@Body request: CreateChoreRequest): Response<ApiResponse>

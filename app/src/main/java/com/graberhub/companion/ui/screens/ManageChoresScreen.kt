@@ -44,10 +44,6 @@ fun ManageChoresScreen(viewModel: MainViewModel, navController: NavController) {
     var editingTemplate by remember { mutableStateOf<ChoreTemplate?>(null) }
     var confirmDeleteId by remember { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadChoreTemplates()
-    }
-
     Column(modifier = Modifier.fillMaxSize()) {
         // Header
         Row(

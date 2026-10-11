@@ -87,13 +87,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadVerses()
-        viewModel.loadActiveVerse()
-        viewModel.loadPhotoSettings()
-        viewModel.loadPhotos()
-    }
-
     // Sync album URL from API when photo settings load
     LaunchedEffect(photoSettings) {
         photoSettings?.album_url?.let { albumUrl = it }

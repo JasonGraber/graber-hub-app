@@ -12,8 +12,8 @@ android {
         applicationId = "com.graberhub.companion"
         minSdk = 26
         targetSdk = 35
-        versionCode = 25
-        versionName = "1.4.7"
+        versionCode = 26
+        versionName = "1.4.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
