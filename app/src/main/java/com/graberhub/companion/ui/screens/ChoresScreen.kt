@@ -200,7 +200,7 @@ private fun KidChoreCard(
                 )
             } else {
                 Spacer(Modifier.height(8.dp))
-                kid.chores.forEach { chore ->
+                kid.chores.sortedBy { it.done }.forEach { chore ->
                     ChoreItem(
                         chore = chore,
                         kidColor = kidColor,
