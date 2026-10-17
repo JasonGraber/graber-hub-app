@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+}
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun quotedBuildValue(property: String, fallback: String): String {
+    val value = localProperties.getProperty(property, fallback)
+    return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 }
 
 android {
@@ -14,6 +26,17 @@ android {
         targetSdk = 35
         versionCode = 27
         versionName = "1.4.9"
+
+        buildConfigField(
+            "String",
+            "GRABER_HUB_HOME_URL",
+            quotedBuildValue("graberHub.homeUrl", "http://192.168.1.100/")
+        )
+        buildConfigField(
+            "String",
+            "GRABER_HUB_TAILSCALE_URL",
+            quotedBuildValue("graberHub.tailscaleUrl", "http://100.64.0.1/")
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

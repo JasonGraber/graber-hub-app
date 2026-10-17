@@ -3,6 +3,7 @@ package com.graberhub.companion.data.prefs
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.graberhub.companion.BuildConfig
 import com.graberhub.companion.data.models.KidConfig
 import com.graberhub.companion.data.models.ScheduleTemplate
 
@@ -11,30 +12,21 @@ class PrefsManager(context: Context) {
     private val prefs = context.getSharedPreferences("graber_hub_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
 
-    init {
-        // The Pi received a new DHCP address. Migrate existing installs that
-        // still have the old home-WiFi address saved.
-        if (prefs.getString(KEY_SERVER_URL, null) == LEGACY_HOME_URL) {
-            prefs.edit().putString(KEY_SERVER_URL, HOME_URL).apply()
-        }
-    }
-
     companion object {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_KIDS = "kids_config"
         private const val KEY_CUSTOM_SCHEDULE_TEMPLATES = "custom_schedule_templates"
         private const val KEY_PHOTO_SOURCE = "photo_source"
 
-        private const val LEGACY_HOME_URL = "http://192.168.86.43/"
-        const val HOME_URL = "http://192.168.86.24/"
-        const val TAILSCALE_URL = "http://100.72.250.82/"
-        const val DEFAULT_SERVER = HOME_URL
+        val HOME_URL: String = BuildConfig.GRABER_HUB_HOME_URL
+        val TAILSCALE_URL: String = BuildConfig.GRABER_HUB_TAILSCALE_URL
+        val DEFAULT_SERVER: String = HOME_URL
 
         val DEFAULT_KIDS = listOf(
-            KidConfig(1, "Aurora", "#ec5281"),
-            KidConfig(2, "Deandre", "#03a9f4"),
-            KidConfig(3, "Alexia", "#a78bfa"),
-            KidConfig(4, "Truett", "#4ade80")
+            KidConfig(1, "Kid 1", "#ec5281"),
+            KidConfig(2, "Kid 2", "#03a9f4"),
+            KidConfig(3, "Kid 3", "#a78bfa"),
+            KidConfig(4, "Kid 4", "#4ade80")
         )
     }
 

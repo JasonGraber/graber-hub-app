@@ -1,101 +1,132 @@
-# 📱 Graber Hub — Companion App
+# 📱 Graber Hub — Android Companion
 
-Android companion app for [Graber Hub](https://github.com/JasonGraber/graber-hub), a family command center running on a Raspberry Pi.
+The parent-side controller for [Graber Hub](https://github.com/JasonGraber/graber-hub), an open-source Raspberry Pi family command center.
 
-Control your family's schedule, chores, countdowns, and display mode — all from your phone.
+<p align="center">
+  <img src="docs/images/schedule.png" alt="Daily schedule" width="30%" />
+  <img src="docs/images/chores.png" alt="Family chores" width="30%" />
+  <img src="docs/images/settings.png" alt="Hub settings" width="30%" />
+</p>
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Android](https://img.shields.io/badge/platform-Android-green.svg)
-![Kotlin](https://img.shields.io/badge/kotlin-Jetpack%20Compose-purple.svg)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Android](https://img.shields.io/badge/platform-Android-3DDC84.svg)
+![Kotlin](https://img.shields.io/badge/language-Kotlin-7F52FF.svg)
+![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg)
 
----
+## What it does
 
-## ✨ Features
+The wall display keeps the family aligned; this app lets a parent update it without standing at the screen.
 
-- **📅 Schedule** — View, add, edit, and delete daily schedule blocks with emoji and time pickers. Includes school day, weekend, and summer templates.
-- **✅ Chores** — Manage per-kid chores with tap-to-complete and recurring templates, including every 1, 2, or 4 weeks.
-- **⏳ Countdowns** — Track upcoming events with animated countdown cards.
-- **⏱️ Timer** — Start countdown timers on the Hub display with alarm sound.
-- **📺 Display Mode** — Switch the Hub between Dashboard, Photos, and Auto modes. Persistent mode indicator shows current state on every screen.
-- **🖼️ Photo Album** — Configure Google Photos album for the Hub's photo slideshow.
-- **📖 Bible Verses** — Add and manage daily Bible verses shown on the Hub.
-- **🎨 Kid Colors** — Customize each kid's accent color.
-- **📡 Network** — Auto-connects via Home WiFi or Tailscale with one-tap switching.
+- Build and edit the day's schedule.
+- Add one-time or recurring chores and mark them complete.
+- Keep unfinished chores at the top automatically.
+- Start a shared timer and manage event countdowns.
+- Add Bible verses and choose the active verse.
+- Upload, rename, and remove slideshow photos.
+- Switch the wall between Dashboard, Photos, and Auto modes.
+- Connect over home Wi-Fi, Tailscale, or a custom server URL.
 
----
+## Requirements
 
-## 🏗️ Tech Stack
+- Android 8.0+ (API 26)
+- A running [Graber Hub server](https://github.com/JasonGraber/graber-hub)
+- Same trusted Wi-Fi network as the Pi, or the same Tailscale network
 
-- **Kotlin** + **Jetpack Compose** + **Material 3**
-- **MVVM** architecture with StateFlow
-- **Retrofit** for REST API communication
-- **Coroutines** for async operations
-- Min SDK 26 / Target SDK 34
+## Install from source
 
----
+### 1. Clone
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Android Studio Hedgehog or later
-- JDK 17
-- Android SDK 34
-
-### Build
 ```bash
 git clone https://github.com/JasonGraber/graber-hub-app.git
 cd graber-hub-app
+```
+
+### 2. Configure the Android SDK
+
+Create an ignored `local.properties`:
+
+```properties
+sdk.dir=/absolute/path/to/Android/Sdk
+```
+
+Optional build-time defaults:
+
+```properties
+graberHub.homeUrl=http://192.168.1.50/
+graberHub.tailscaleUrl=http://100.64.0.10/
+```
+
+These are conveniences, not credentials. Keep real private addresses out of commits. Users can enter the Hub URL from the app.
+
+### 3. Build
+
+```bash
 ./gradlew assembleDebug
 ```
 
-APK output: `app/build/outputs/apk/debug/graber-hub-<version>.apk`
+The APK is written to:
 
-### Configure
-On first launch, the app connects to the Hub at `192.168.86.43` (default). Use Settings to:
-- Switch between Home WiFi and Tailscale networks
-- Enter a custom server URL
-- Test connection
-
----
-
-## 📁 Project Structure
-
+```text
+app/build/outputs/apk/debug/graber-hub-1.4.9.apk
 ```
+
+### 4. Install
+
+```bash
+adb install -r app/build/outputs/apk/debug/graber-hub-1.4.9.apk
+```
+
+### 5. Connect
+
+Open **Settings → Server Connection**, enter `http://PI_ADDRESS/`, and tap **Save & Connect**. Keep the trailing slash.
+
+For full environment setup, emulator networking, verification, and the regression checklist, read [Android Setup and Development](docs/DEVELOPMENT.md).
+
+## Project structure
+
+```text
 app/src/main/java/com/graberhub/companion/
-├── MainActivity.kt              # App entry, navigation, display mode indicator
-├── alarm/AlarmService.kt         # Timer alarm foreground service
+├── MainActivity.kt                 # Compose shell and bottom navigation
+├── alarm/AlarmService.kt           # Timer alarm foreground service
 ├── data/
-│   ├── models/Models.kt         # Data classes (Kid, ScheduleBlock, Chore, etc.)
-│   └── prefs/PrefsManager.kt    # SharedPreferences for server URL & kid colors
+│   ├── models/Models.kt            # API models
+│   └── prefs/PrefsManager.kt       # URLs, colors, local templates
 ├── network/
-│   ├── ApiService.kt            # Retrofit API interface
-│   └── RetrofitClient.kt        # Retrofit singleton with auto-init
+│   ├── ApiService.kt               # REST contract
+│   └── RetrofitClient.kt           # Client and data-version interceptors
 ├── ui/
-│   ├── components/              # Reusable composables
-│   │   ├── CommonComponents.kt  # Time pickers, emoji picker
-│   │   ├── ColorPickerDialog.kt # Kid color customization
-│   │   ├── DisplayModeIndicator.kt # Global display mode chip
-│   │   └── EmojiPicker.kt      # Emoji selection grid
-│   ├── navigation/NavGraph.kt   # Navigation routes
-│   ├── screens/                 # Feature screens
-│   │   ├── ScheduleScreen.kt
-│   │   ├── ChoresScreen.kt
-│   │   ├── CountdownsScreen.kt
-│   │   ├── TimerScreen.kt
-│   │   └── SettingsScreen.kt
-│   └── theme/                   # Material 3 theme (colors, typography)
-└── viewmodel/MainViewModel.kt   # Shared ViewModel for all screens
+│   ├── components/                 # Shared Compose components
+│   ├── navigation/NavGraph.kt      # Routes
+│   ├── screens/                    # Schedule, chores, timer, etc.
+│   └── theme/                      # Colors and typography
+└── viewmodel/MainViewModel.kt      # Shared state and mutations
 ```
 
----
+## Technical notes
 
-## 🔗 Related Repos
+- Kotlin, Jetpack Compose, Material 3
+- MVVM with StateFlow and coroutines
+- Retrofit + Gson
+- Min SDK 26 / Target SDK 35
+- Optimistic concurrency through `X-Data-Version`
+- Foreground auto-refresh on active screens
 
-- **[graber-hub](https://github.com/JasonGraber/graber-hub)** — Web dashboard & API (runs on Raspberry Pi)
-- **graber-hub-watch** — Wear OS companion for Pixel Watch *(coming soon)*
+## Agent-assisted development
 
----
+[AGENTS.md](AGENTS.md) is the operational handoff: invariants, source-of-truth files, local configuration, build gates, and release discipline.
 
-## 📄 License
+```bash
+./gradlew clean compileDebugKotlin lintDebug assembleDebug
+```
 
-MIT License — see [LICENSE](LICENSE) for details.
+## Security
+
+The app intentionally allows local cleartext HTTP. Use it only with a trusted LAN or private VPN, never a Hub API exposed directly to the Internet. See [SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), use fictional screenshots/data, and include build plus manual UI results.
+
+## License
+
+[MIT](LICENSE) © 2026 Jason Graber

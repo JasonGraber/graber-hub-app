@@ -1,6 +1,8 @@
 package com.graberhub.companion.network
 
 import android.util.Log
+import com.graberhub.companion.BuildConfig
+import com.graberhub.companion.data.prefs.PrefsManager
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -13,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object RetrofitClient {
 
     private const val TAG = "RetrofitClient"
-    private var baseUrl = "http://192.168.86.24/"
+    private var baseUrl = PrefsManager.DEFAULT_SERVER
     private var retrofit: Retrofit? = null
     private var apiService: ApiService? = null
 
@@ -75,7 +77,11 @@ object RetrofitClient {
             val logging = HttpLoggingInterceptor { message ->
                 Log.d(TAG, message)
             }.apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = if (BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.BODY
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
             }
             val client = OkHttpClient.Builder()
                 .addInterceptor(versionRequestInterceptor)
