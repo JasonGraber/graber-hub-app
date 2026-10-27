@@ -14,6 +14,7 @@ sealed class Screen(val route: String, val label: String, val emoji: String) {
     data object Timer : Screen("timer", "Timer", "⏱️")
     data object Settings : Screen("settings", "Settings", "⚙️")
     data object ManageChores : Screen("manage_chores", "Manage Chores", "📋")
+    data object PaidJobs : Screen("paid_jobs", "Paid Jobs", "$")
 }
 
 @Composable
@@ -25,5 +26,6 @@ fun NavGraph(navController: NavHostController, viewModel: MainViewModel) {
         composable(Screen.Timer.route) { TimerScreen(viewModel) }
         composable(Screen.Settings.route) { SettingsScreen(viewModel) }
         composable(Screen.ManageChores.route) { ManageChoresScreen(viewModel, navController) }
+        composable(Screen.PaidJobs.route) { PaidJobsScreen(viewModel) }
     }
 }

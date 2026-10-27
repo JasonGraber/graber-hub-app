@@ -4,7 +4,7 @@ The parent-side controller for [Graber Hub](https://github.com/JasonGraber/grabe
 
 <p align="center">
   <img src="docs/images/schedule.png" alt="Daily schedule" width="30%" />
-  <img src="docs/images/chores.png" alt="Family chores" width="30%" />
+  <img src="docs/images/paid-jobs.png" alt="Paid jobs" width="30%" />
   <img src="docs/images/settings.png" alt="Hub settings" width="30%" />
 </p>
 
@@ -20,7 +20,9 @@ The wall display keeps the family aligned; this app lets a parent update it with
 - Build and edit the day's schedule.
 - Add one-time or recurring chores and mark them complete.
 - Keep unfinished chores at the top automatically.
-- Start a shared timer and manage event countdowns.
+- Post $1–$10 paid jobs that children can claim after finishing their chores.
+- Complete, reopen, edit, and remove paid jobs while keeping their dashboard order stable.
+- Manage event countdowns.
 - Add Bible verses and choose the active verse.
 - Upload, rename, and remove slideshow photos.
 - Switch the wall between Dashboard, Photos, and Auto modes.
@@ -67,13 +69,13 @@ These are conveniences, not credentials. Keep real private addresses out of comm
 The APK is written to:
 
 ```text
-app/build/outputs/apk/debug/graber-hub-1.4.9.apk
+app/build/outputs/apk/debug/graber-hub-1.5.0.apk
 ```
 
 ### 4. Install
 
 ```bash
-adb install -r app/build/outputs/apk/debug/graber-hub-1.4.9.apk
+adb install -r app/build/outputs/apk/debug/graber-hub-1.5.0.apk
 ```
 
 ### 5. Connect
@@ -97,7 +99,7 @@ app/src/main/java/com/graberhub/companion/
 ├── ui/
 │   ├── components/                 # Shared Compose components
 │   ├── navigation/NavGraph.kt      # Routes
-│   ├── screens/                    # Schedule, chores, timer, etc.
+│   ├── screens/                    # Schedule, chores, paid jobs, etc.
 │   └── theme/                      # Colors and typography
 └── viewmodel/MainViewModel.kt      # Shared state and mutations
 ```

@@ -6,9 +6,25 @@ data class DashboardResponse(
     val kids: List<Kid>,
     val schedule: List<ScheduleBlock>,
     val countdowns: List<Countdown>,
+    @SerializedName("paid_jobs") val paidJobs: List<PaidJob> = emptyList(),
     val verse: Verse?,
     val date: String,
     val data_version: Int? = null
+)
+
+data class PaidJob(
+    val id: Int,
+    val title: String,
+    val description: String = "",
+    val amount: Int,
+    val due_date: String,
+    val status: String = "available",
+    val claimed_by_kid_id: Int? = null,
+    val claimed_by_name: String? = null,
+    val claimed_at: String? = null,
+    val completed_at: String? = null,
+    val claim_reopened: Boolean = false,
+    val last_claimed_by_kid_id: Int? = null
 )
 
 data class HeartbeatResponse(
@@ -136,6 +152,17 @@ data class UpdateVerseRequest(
 data class UpdateKidColorRequest(
     val color: String
 )
+
+data class CreatePaidJobRequest(
+    val title: String,
+    val description: String,
+    val amount: Int,
+    val due_date: String
+)
+
+data class ClaimPaidJobRequest(val kid_id: Int)
+
+data class CompletePaidJobRequest(val completed: Boolean)
 
 // Photo Settings
 data class AutoSchedule(

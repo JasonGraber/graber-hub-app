@@ -121,4 +121,23 @@ interface ApiService {
 
     @DELETE("api.php/chore-templates/{id}")
     suspend fun deleteChoreTemplate(@Path("id") id: Int): Response<ApiResponse>
+
+    // Paid Jobs
+    @GET("api.php/paid-jobs")
+    suspend fun getPaidJobs(): Response<List<PaidJob>>
+
+    @POST("api.php/paid-jobs")
+    suspend fun createPaidJob(@Body request: CreatePaidJobRequest): Response<ApiResponse>
+
+    @PUT("api.php/paid-jobs/{id}")
+    suspend fun updatePaidJob(@Path("id") id: Int, @Body request: CreatePaidJobRequest): Response<ApiResponse>
+
+    @PUT("api.php/paid-jobs/{id}/claim")
+    suspend fun claimPaidJob(@Path("id") id: Int, @Body request: ClaimPaidJobRequest): Response<ApiResponse>
+
+    @PUT("api.php/paid-jobs/{id}/complete")
+    suspend fun completePaidJob(@Path("id") id: Int, @Body request: CompletePaidJobRequest): Response<ApiResponse>
+
+    @DELETE("api.php/paid-jobs/{id}")
+    suspend fun deletePaidJob(@Path("id") id: Int): Response<ApiResponse>
 }

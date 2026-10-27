@@ -72,7 +72,7 @@ fun GraberHubApp() {
     val screens = listOf(
         Screen.Schedule,
         Screen.Chores,
-        Screen.Timer,
+        Screen.PaidJobs,
         Screen.Countdowns,
         Screen.Settings
     )

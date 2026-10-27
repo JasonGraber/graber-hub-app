@@ -53,6 +53,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _countdowns = MutableStateFlow<List<Countdown>>(emptyList())
     val countdowns: StateFlow<List<Countdown>> = _countdowns.asStateFlow()
 
+    private val _paidJobs = MutableStateFlow<List<PaidJob>>(emptyList())
+    val paidJobs: StateFlow<List<PaidJob>> = _paidJobs.asStateFlow()
+
     private val _verse = MutableStateFlow<Verse?>(null)
     val verse: StateFlow<Verse?> = _verse.asStateFlow()
 
@@ -117,6 +120,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _choreMutationInProgress = MutableStateFlow(false)
     val choreMutationInProgress: StateFlow<Boolean> = _choreMutationInProgress.asStateFlow()
+
+    private val _paidJobMutationInProgress = MutableStateFlow(false)
+    val paidJobMutationInProgress: StateFlow<Boolean> = _paidJobMutationInProgress.asStateFlow()
 
     private var autoRefreshJob: Job? = null
     private var activeScreenRoute: String? = null
@@ -205,6 +211,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _kids.value = dashboard.kids
         _schedule.value = dashboard.schedule.sortedBy { it.time_start }
         _countdowns.value = dashboard.countdowns
+        _paidJobs.value = dashboard.paidJobs
         _verse.value = dashboard.verse
 
         val serverKids = dashboard.kids.map { KidConfig(it.id, it.name, it.color) }
@@ -325,6 +332,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _error.value = "$action failed: ${e.message ?: "connection error"}"
             } finally {
                 _choreMutationInProgress.value = false
+            }
+        }
+    }
+
+    private fun launchPaidJobMutation(
+        action: String,
+        request: suspend () -> Response<ApiResponse>
+    ) {
+        if (!requireDataReady() || _paidJobMutationInProgress.value) return
+        _paidJobMutationInProgress.value = true
+        viewModelScope.launch {
+            try {
+                var response = request()
+                if (response.code() == 409 && handle409(response)) {
+                    response = request()
+                }
+                if (!response.isSuccessful) {
+                    val serverMessage = response.errorBody()?.string()
+                        ?.substringAfter("\"error\":\"")
+                        ?.substringBefore("\"")
+                        ?.replace("\\'", "'")
+                    _error.value = serverMessage?.takeIf { it.isNotBlank() }
+                        ?: "$action failed (${response.code()})"
+                    return@launch
+                }
+                if (refreshDashboard()) {
+                    _error.value = null
+                } else {
+                    _error.value = "$action saved, but the latest jobs could not be refreshed"
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "$action failed", e)
+                _error.value = "$action failed: ${e.message ?: "connection error"}"
+            } finally {
+                _paidJobMutationInProgress.value = false
             }
         }
     }
@@ -491,6 +533,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteChore(choreId: Int) {
         launchChoreMutation("Delete chore") {
             RetrofitClient.getApiService().deleteChore(choreId, today())
+        }
+    }
+
+    // ── Paid Jobs ──────────────────────────────────────────
+
+    fun addPaidJob(title: String, description: String, amount: Int, dueDate: String) {
+        val request = CreatePaidJobRequest(title.trim(), description.trim(), amount, dueDate)
+        launchPaidJobMutation("Add paid job") {
+            RetrofitClient.getApiService().createPaidJob(request)
+        }
+    }
+
+    fun editPaidJob(id: Int, title: String, description: String, amount: Int, dueDate: String) {
+        val request = CreatePaidJobRequest(title.trim(), description.trim(), amount, dueDate)
+        launchPaidJobMutation("Edit paid job") {
+            RetrofitClient.getApiService().updatePaidJob(id, request)
+        }
+    }
+
+    fun claimPaidJob(id: Int, kidId: Int) {
+        launchPaidJobMutation("Claim paid job") {
+            RetrofitClient.getApiService().claimPaidJob(id, ClaimPaidJobRequest(kidId))
+        }
+    }
+
+    fun completePaidJob(id: Int, completed: Boolean) {
+        launchPaidJobMutation(if (completed) "Complete paid job" else "Reopen paid job") {
+            RetrofitClient.getApiService().completePaidJob(id, CompletePaidJobRequest(completed))
+        }
+    }
+
+    fun deletePaidJob(id: Int) {
+        launchPaidJobMutation("Delete paid job") {
+            RetrofitClient.getApiService().deletePaidJob(id)
         }
     }
 
